@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, RefreshCw, Search } from 'lucide-react';
+import { Calendar, Plus, RefreshCw, Search, CheckCircle2 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { useClients } from '../hooks/useClients';
 import { useBarbers } from '../hooks/useBarbers';
@@ -9,6 +9,7 @@ import { AppointmentModal } from '../components/appointments/AppointmentModal';
 import { AppointmentDetailsModal } from '../components/appointments/AppointmentDetailsModal';
 import { CalendarEvent } from '../types/appointment';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
 
 export const Appointments: React.FC = () => {
@@ -19,6 +20,7 @@ export const Appointments: React.FC = () => {
     loading: appointmentsLoading,
     fetchAppointments,
     createAppointment,
+    updateAppointmentStatus,
     convertToCalendarEvents
   } = useAppointments();
 
@@ -38,6 +40,7 @@ export const Appointments: React.FC = () => {
 
   const {
     services,
+    setServices,
     loading: servicesLoading,
     fetchServices
   } = useServices();
@@ -48,6 +51,8 @@ export const Appointments: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [modalLoading, setModalLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [completingAll, setCompletingAll] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -57,10 +62,11 @@ export const Appointments: React.FC = () => {
     // Converter agendamentos para eventos do calendário
     const calendarEvents = convertToCalendarEvents(appointments);
     setEvents(calendarEvents);
-  }, [appointments, convertToCalendarEvents]);
+  }, [appointments]);
 
   const loadInitialData = async () => {
     try {
+      setLoading(true);
       await Promise.all([
         loadAppointments(),
         loadClients(),
@@ -70,6 +76,8 @@ export const Appointments: React.FC = () => {
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);
       toast.error('Erro ao carregar dados');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -151,7 +159,83 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const isLoading = appointmentsLoading || clientsLoading || barbersLoading || servicesLoading;
+  const handleStatusChange = async (appointmentId: number, newStatus: string) => {
+    try {
+      const success = await updateAppointmentStatus(appointmentId, newStatus);
+      if (success) {
+        await loadAppointments();
+        // Atualizar o evento selecionado se for o mesmo
+        if (selectedEvent?.resource.appointment.id === appointmentId) {
+          setSelectedEvent(null);
+          setIsDetailsModalOpen(false);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      throw error;
+    }
+  };
+
+  const handleCompleteAllToday = async () => {
+    setCompletingAll(true);
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+      // Buscar agendamentos de hoje que estão como 'scheduled'
+      let query = supabase
+        .from('appointments')
+        .select('id')
+        .eq('status', 'scheduled')
+        .gte('appointment_datetime', startOfDay.toISOString())
+        .lte('appointment_datetime', endOfDay.toISOString());
+
+      // Filtrar por barbeiro se usuário for barbeiro
+      if (user?.role === 'barber' && user.barber?.id) {
+        query = query.eq('barber_id', user.barber.id);
+      }
+
+      const { data: todayAppointments, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+
+      if (!todayAppointments || todayAppointments.length === 0) {
+        toast.info('Nenhum agendamento pendente encontrado para hoje');
+        return;
+      }
+
+      // Atualizar todos para 'completed'
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ status: 'completed' })
+        .in('id', todayAppointments.map(apt => apt.id));
+
+      if (updateError) throw updateError;
+
+      await loadAppointments();
+      toast.success(`${todayAppointments.length} agendamentos marcados como concluídos!`);
+    } catch (error) {
+      console.error('Erro ao concluir agendamentos:', error);
+      toast.error('Erro ao concluir agendamentos');
+    } finally {
+      setCompletingAll(false);
+    }
+  };
+
+  const getTodayScheduledCount = () => {
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+    
+    return appointments.filter(apt => {
+      const aptDate = new Date(apt.appointment_datetime);
+      return apt.status === 'scheduled' && 
+             aptDate >= startOfDay && 
+             aptDate <= endOfDay;
+    }).length;
+  };
+
+  const isLoading = loading;
 
   return (
     <div className="h-full flex flex-col space-y-6">
@@ -181,6 +265,17 @@ export const Appointments: React.FC = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
           </button>
+          
+          {getTodayScheduledCount() > 0 && (
+            <button
+              onClick={handleCompleteAllToday}
+              disabled={completingAll || isLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
+              Concluir Todos Hoje ({getTodayScheduledCount()})
+            </button>
+          )}
           
           <button
             onClick={handleNewAppointment}
@@ -220,6 +315,8 @@ export const Appointments: React.FC = () => {
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         event={selectedEvent}
+        onStatusChange={handleStatusChange}
+        canChangeStatus={true}
       />
     </div>
   );

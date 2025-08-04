@@ -8,7 +8,11 @@ import {
   Scissors,
   TrendingUp,
   Package,
-  UserCheck
+  UserCheck,
+  Receipt,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
 import { ReportCard } from '../components/reports/ReportCard';
@@ -117,6 +121,132 @@ export const Reports: React.FC = () => {
             />
           </div>
 
+          {/* Balanço Financeiro */}
+          {user?.role === 'admin' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                <DollarSign className="h-5 w-5 mr-2" />
+                Balanço Financeiro - {selectedPeriod.label}
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {dashboardData.financialReport.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                  <div className="text-sm text-green-800">Faturamento Total</div>
+                </div>
+                
+                <div className="bg-red-50 p-4 rounded-lg text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <XCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-red-600">
+                    {dashboardData.financialReport.totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                  <div className="text-sm text-red-800">Despesas Total</div>
+                </div>
+                
+                <div className="bg-orange-50 p-4 rounded-lg text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Receipt className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {dashboardData.financialReport.totalCommissions.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                  <div className="text-sm text-orange-800">Comissões Pagas</div>
+                </div>
+                
+                <div className={`p-4 rounded-lg text-center ${
+                  dashboardData.financialReport.netRevenue >= 0 
+                    ? 'bg-blue-50' 
+                    : 'bg-red-50'
+                }`}>
+                  <div className="flex items-center justify-center mb-2">
+                    {dashboardData.financialReport.netRevenue >= 0 ? (
+                      <TrendingUp className="h-6 w-6 text-blue-600" />
+                    ) : (
+                      <AlertTriangle className="h-6 w-6 text-red-600" />
+                    )}
+                  </div>
+                  <div className={`text-2xl font-bold ${
+                    dashboardData.financialReport.netRevenue >= 0 
+                      ? 'text-blue-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {dashboardData.financialReport.netRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                  <div className={`text-sm ${
+                    dashboardData.financialReport.netRevenue >= 0 
+                      ? 'text-blue-800' 
+                      : 'text-red-800'
+                  }`}>
+                    Lucro {dashboardData.financialReport.netRevenue >= 0 ? 'Líquido' : '(Prejuízo)'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico de despesas por categoria */}
+              {dashboardData.financialReport.expensesByCategory.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-md font-medium text-gray-900 mb-3">Despesas por Categoria</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {dashboardData.financialReport.expensesByCategory.map((expense, index) => (
+                      <div key={expense.category} className="bg-gray-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-900">{expense.category}</span>
+                          <span className="text-sm font-bold text-red-600">
+                            {expense.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{expense.count} despesa(s)</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Análise de performance */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="text-md font-medium text-gray-900 mb-3">Análise Financeira</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Margem de Lucro:</span>
+                    <span className={`ml-2 font-medium ${
+                      dashboardData.financialReport.netRevenue >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {dashboardData.financialReport.totalRevenue > 0 
+                        ? ((dashboardData.financialReport.netRevenue / dashboardData.financialReport.totalRevenue) * 100).toFixed(1)
+                        : '0'
+                      }%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">% Comissões:</span>
+                    <span className="ml-2 font-medium text-orange-600">
+                      {dashboardData.financialReport.totalRevenue > 0 
+                        ? ((dashboardData.financialReport.totalCommissions / dashboardData.financialReport.totalRevenue) * 100).toFixed(1)
+                        : '0'
+                      }%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">% Despesas:</span>
+                    <span className="ml-2 font-medium text-red-600">
+                      {dashboardData.financialReport.totalRevenue > 0 
+                        ? ((dashboardData.financialReport.totalExpenses / dashboardData.financialReport.totalRevenue) * 100).toFixed(1)
+                        : '0'
+                      }%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Gráficos de receita */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SimpleChart
@@ -129,12 +259,12 @@ export const Reports: React.FC = () => {
             />
             
             <SimpleChart
-              title="Receita por Fonte"
+              title="Receita vs Despesas"
               type="bar"
               data={[
-                { label: 'Serviços', value: dashboardData.financialReport.servicesRevenue, color: 'bg-blue-500' },
-                { label: 'Produtos', value: dashboardData.financialReport.salesRevenue, color: 'bg-green-500' },
-                { label: 'Comissões', value: dashboardData.financialReport.totalCommissions, color: 'bg-red-500' }
+                { label: 'Faturamento', value: dashboardData.financialReport.totalRevenue, color: 'bg-green-500' },
+                { label: 'Despesas', value: dashboardData.financialReport.totalExpenses, color: 'bg-red-500' },
+                { label: 'Comissões', value: dashboardData.financialReport.totalCommissions, color: 'bg-orange-500' }
               ]}
             />
           </div>

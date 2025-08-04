@@ -306,22 +306,56 @@ export const useReports = () => {
 
   const generateFinancialReport = async (period: ReportPeriod): Promise<FinancialReport> => {
     try {
-      // Buscar vendas e agendamentos em paralelo
-      const [salesResult, appointmentsResult] = await Promise.all([
+      // Buscar vendas, agendamentos e despesas em paralelo
+      const [salesResult, appointmentsResult, expensesResult] = await Promise.all([
         generateSalesReport(period),
-        generateAppointmentsReport(period)
+        generateAppointmentsReport(period),
+        // Buscar despesas do período
+        supabase
+          .from('expenses')
+          .select('*')
+          .gte('expense_date', period.startDate.toISOString().split('T')[0])
+          .lte('expense_date', period.endDate.toISOString().split('T')[0])
       ]);
+
+      if (expensesResult.error) throw expensesResult.error;
 
       const salesRevenue = salesResult.totalRevenue;
       const servicesRevenue = appointmentsResult.totalRevenue;
       const totalRevenue = salesRevenue + servicesRevenue;
+
+      // Calcular despesas totais
+      const expenses = expensesResult.data || [];
+      const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
       // Calcular comissões totais
       const salesCommissions = salesResult.salesByBarber.reduce((sum, barber) => sum + barber.commission, 0);
       const servicesCommissions = appointmentsResult.appointmentsByBarber.reduce((sum, barber) => sum + barber.commission, 0);
       const totalCommissions = salesCommissions + servicesCommissions;
 
-      const netRevenue = totalRevenue - totalCommissions;
+      const netRevenue = totalRevenue - totalCommissions - totalExpenses;
+
+      // Despesas por categoria
+      const expensesByCategory = new Map();
+      expenses.forEach(expense => {
+        const existing = expensesByCategory.get(expense.category) || {
+          category: expense.category,
+          total: 0,
+          count: 0
+        };
+        existing.total += expense.amount;
+        existing.count += 1;
+        expensesByCategory.set(expense.category, existing);
+      });
+
+      // Despesas por dia
+      const expensesByDay = new Map();
+      expenses.forEach(expense => {
+        const date = expense.expense_date;
+        const existing = expensesByDay.get(date) || { date, total: 0 };
+        existing.total += expense.amount;
+        expensesByDay.set(date, existing);
+      });
 
       // Combinar receita por dia
       const revenueByDay = new Map();
@@ -382,9 +416,12 @@ export const useReports = () => {
         salesRevenue,
         servicesRevenue,
         totalCommissions,
+        totalExpenses,
         netRevenue,
         revenueByDay: Array.from(revenueByDay.values()).sort((a, b) => a.date.localeCompare(b.date)),
-        commissionsByBarber: Array.from(commissionsByBarber.values()).sort((a, b) => b.totalCommission - a.totalCommission)
+        commissionsByBarber: Array.from(commissionsByBarber.values()).sort((a, b) => b.totalCommission - a.totalCommission),
+        expensesByCategory: Array.from(expensesByCategory.values()).sort((a, b) => b.total - a.total),
+        expensesByDay: Array.from(expensesByDay.values()).sort((a, b) => a.date.localeCompare(b.date))
       };
     } catch (error) {
       console.error('Erro ao gerar relatório financeiro:', error);

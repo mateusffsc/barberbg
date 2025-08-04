@@ -13,6 +13,7 @@ import { Barbers } from './pages/Barbers';
 import { Appointments } from './pages/Appointments';
 import { Sales } from './pages/Sales';
 import { Reports } from './pages/Reports';
+import { Expenses } from './pages/Expenses';
 
 function App() {
   return (
@@ -57,6 +58,12 @@ function App() {
             <Route path="relatorios" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Reports />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="despesas" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Expenses />
               </ProtectedRoute>
             } />
 

@@ -77,6 +77,7 @@ export interface FinancialReport {
   salesRevenue: number;
   servicesRevenue: number;
   totalCommissions: number;
+  totalExpenses: number;
   netRevenue: number;
   revenueByDay: Array<{
     date: string;
@@ -90,6 +91,15 @@ export interface FinancialReport {
     totalCommission: number;
     serviceCommission: number;
     productCommission: number;
+  }>;
+  expensesByCategory: Array<{
+    category: string;
+    total: number;
+    count: number;
+  }>;
+  expensesByDay: Array<{
+    date: string;
+    total: number;
   }>;
 }
 

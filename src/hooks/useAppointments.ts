@@ -4,6 +4,7 @@ import { Appointment, AppointmentFormData, AppointmentsResponse, CalendarEvent }
 import { Service } from '../types/service';
 import { Barber } from '../types/barber';
 import { useAuth } from '../contexts/AuthContext';
+import { fromLocalDateTimeString, toLocalISOString } from '../utils/dateHelpers';
 import toast from 'react-hot-toast';
 
 export const useAppointments = () => {
@@ -87,10 +88,15 @@ export const useAppointments = () => {
       const totalDuration = selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
       
       // Gerar datas dos agendamentos baseado na recorrência
+      // Usar função que não converte timezone
       const appointmentDates = generateRecurrenceDates(
-        new Date(appointmentData.appointment_datetime),
+        fromLocalDateTimeString(appointmentData.appointment_datetime),
         recurrence
       );
+      
+      console.log('Data original do form:', appointmentData.appointment_datetime);
+      console.log('Data convertida:', appointmentDates[0]);
+      console.log('Data que será salva:', toLocalISOString(appointmentDates[0]));
 
       // Verificar conflitos para todas as datas
       for (const date of appointmentDates) {
@@ -102,8 +108,8 @@ export const useAppointments = () => {
           .select('id')
           .eq('barber_id', appointmentData.barber_id)
           .eq('status', 'scheduled')
-          .gte('appointment_datetime', startTime.toISOString())
-          .lt('appointment_datetime', endTime.toISOString());
+          .gte('appointment_datetime', toLocalISOString(startTime))
+          .lt('appointment_datetime', toLocalISOString(endTime));
 
         if (conflicts && conflicts.length > 0) {
           toast.error(`Conflito de horário em ${startTime.toLocaleDateString('pt-BR')}`);
@@ -121,7 +127,7 @@ export const useAppointments = () => {
           .insert({
             client_id: appointmentData.client_id,
             barber_id: appointmentData.barber_id,
-            appointment_datetime: date.toISOString(),
+            appointment_datetime: toLocalISOString(date),
             status: 'scheduled',
             total_price: totalPrice,
             note: appointmentData.note.trim() || null

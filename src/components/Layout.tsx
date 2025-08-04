@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Receipt
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -32,6 +33,7 @@ const menuItems: MenuItem[] = [
   { name: 'Serviços', path: '/servicos', icon: Scissors, roles: ['admin'] },
   { name: 'Produtos', path: '/produtos', icon: Package, roles: ['admin'] },
   { name: 'Vendas', path: '/vendas', icon: ShoppingCart, roles: ['admin', 'barber'] },
+  { name: 'Despesas', path: '/despesas', icon: Receipt, roles: ['admin'] },
   { name: 'Relatórios', path: '/relatorios', icon: BarChart3, roles: ['admin'] },
 ];
 

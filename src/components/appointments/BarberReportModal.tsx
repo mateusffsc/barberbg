@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, UserCheck, DollarSign, Calendar, TrendingUp, Percent, Package, Scissors } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { toLocalISOString } from '../../utils/dateHelpers';
 
 interface BarberReportModalProps {
   isOpen: boolean;
@@ -46,6 +47,27 @@ interface RecentAppointment {
   }>;
 }
 
+interface RecentSale {
+  id: number;
+  sale_datetime: string;
+  total_amount: number;
+  products: Array<{
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+}
+
+interface CommissionTransaction {
+  id: string;
+  date: string;
+  type: 'appointment' | 'sale';
+  client_name?: string;
+  items: string[];
+  total_value: number;
+  commission_value: number;
+}
+
 export const BarberReportModal: React.FC<BarberReportModalProps> = ({
   isOpen,
   onClose,
@@ -54,6 +76,8 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
   const [barber, setBarber] = useState<BarberDetails | null>(null);
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null);
   const [recentAppointments, setRecentAppointments] = useState<RecentAppointment[]>([]);
+  const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
+  const [commissionTransactions, setCommissionTransactions] = useState<CommissionTransaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('month'); // month, week, today
 
@@ -66,21 +90,33 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
   const getPeriodDates = () => {
     const now = new Date();
     let startDate: Date;
+    let endDate: Date;
     
     switch (selectedPeriod) {
       case 'today':
         startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         break;
       case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        // Início da semana atual (domingo)
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        startDate = startOfWeek;
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         break;
       case 'month':
       default:
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         break;
     }
     
-    return { startDate, endDate: now };
+    console.log('Relatório Barbeiro - Período:', selectedPeriod);
+    console.log('Data início:', startDate.toLocaleString('pt-BR'));
+    console.log('Data fim:', endDate.toLocaleString('pt-BR'));
+    
+    return { startDate, endDate };
   };
 
   const loadBarberData = async () => {
@@ -117,10 +153,17 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
           )
         `)
         .eq('barber_id', barberId)
-        .gte('appointment_datetime', startDate.toISOString())
-        .lte('appointment_datetime', endDate.toISOString())
+        .gte('appointment_datetime', toLocalISOString(startDate))
+        .lte('appointment_datetime', toLocalISOString(endDate))
         .eq('status', 'completed')
         .order('appointment_datetime', { ascending: false });
+        
+      console.log('Query agendamentos:', {
+        barberId,
+        startDate: toLocalISOString(startDate),
+        endDate: toLocalISOString(endDate),
+        resultCount: appointmentsData?.length || 0
+      });
 
       if (appointmentsError) throw appointmentsError;
 
@@ -160,9 +203,96 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
 
       setRecentAppointments(formattedAppointments);
 
-      // TODO: Buscar vendas de produtos quando implementado
-      const totalProducts = 0;
-      const productCommission = 0;
+      // Buscar vendas de produtos do período
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          total_amount,
+          sale_datetime,
+          sale_products(
+            quantity,
+            price_at_sale,
+            commission_rate_applied,
+            product:products(name)
+          )
+        `)
+        .eq('barber_id', barberId)
+        .gte('sale_datetime', toLocalISOString(startDate))
+        .lte('sale_datetime', toLocalISOString(endDate))
+        .order('sale_datetime', { ascending: false });
+        
+      console.log('Query vendas:', {
+        barberId,
+        salesCount: salesData?.length || 0,
+        salesError
+      });
+      
+      let totalProducts = 0;
+      let productCommission = 0;
+      
+      const formattedSales = salesData?.map(sale => {
+        const products = sale.sale_products?.map((sp: any) => {
+          totalProducts += sp.quantity;
+          productCommission += sp.price_at_sale * sp.quantity * sp.commission_rate_applied;
+          
+          return {
+            name: sp.product.name,
+            quantity: sp.quantity,
+            price: sp.price_at_sale
+          };
+        }) || [];
+        
+        return {
+          ...sale,
+          products
+        };
+      }) || [];
+      
+      setRecentSales(formattedSales);
+      
+      // Criar lista combinada de transações de comissão
+      const transactions: CommissionTransaction[] = [];
+      
+      // Adicionar agendamentos
+      formattedAppointments.forEach(apt => {
+        const serviceCommissions = apt.services.reduce((sum, service) => {
+          const rate = service.is_chemical 
+            ? barberData.commission_rate_chemical_service 
+            : barberData.commission_rate_service;
+          return sum + (service.price * rate);
+        }, 0);
+        
+        transactions.push({
+          id: `apt-${apt.id}`,
+          date: apt.appointment_datetime,
+          type: 'appointment',
+          client_name: apt.client.name,
+          items: apt.services.map(s => s.name),
+          total_value: apt.total_price,
+          commission_value: serviceCommissions
+        });
+      });
+      
+      // Adicionar vendas
+      formattedSales.forEach(sale => {
+        const saleCommission = sale.sale_products?.reduce((sum: number, sp: any) => {
+          return sum + (sp.price_at_sale * sp.quantity * sp.commission_rate_applied);
+        }, 0) || 0;
+        
+        transactions.push({
+          id: `sale-${sale.id}`,
+          date: sale.sale_datetime,
+          type: 'sale',
+          items: sale.products.map(p => `${p.name} (${p.quantity}x)`),
+          total_value: sale.total_amount,
+          commission_value: saleCommission
+        });
+      });
+      
+      // Ordenar por data (mais recente primeiro)
+      transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setCommissionTransactions(transactions);
 
       setCommissionData({
         totalServices,
@@ -329,54 +459,67 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
                   </div>
                 )}
 
-                {/* Atendimentos Recentes */}
+                {/* Comissões Recentes */}
                 <div>
                   <h4 className="text-lg font-medium text-gray-900 mb-4">
-                    Atendimentos Recentes - {getPeriodLabel()}
+                    Comissões Recentes - {getPeriodLabel()}
                   </h4>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {recentAppointments.length > 0 ? (
-                      recentAppointments.map((appointment) => (
-                        <div key={appointment.id} className="border border-gray-200 rounded-lg p-4">
+                    {commissionTransactions.length > 0 ? (
+                      commissionTransactions.map((transaction) => (
+                        <div key={transaction.id} className="border border-gray-200 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center space-x-2">
                               <Calendar className="h-4 w-4 text-gray-500" />
                               <span className="font-medium text-gray-900">
-                                {new Date(appointment.appointment_datetime).toLocaleDateString('pt-BR')}
+                                {new Date(transaction.date).toLocaleDateString('pt-BR')}
                               </span>
                               <span className="text-gray-500">
-                                {new Date(appointment.appointment_datetime).toLocaleTimeString('pt-BR', {
+                                {new Date(transaction.date).toLocaleTimeString('pt-BR', {
                                   hour: '2-digit',
                                   minute: '2-digit'
                                 })}
                               </span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <DollarSign className="h-4 w-4 text-green-600" />
-                              <span className="font-medium text-green-600">
-                                {formatCurrency(appointment.total_price)}
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                transaction.type === 'appointment' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {transaction.type === 'appointment' ? 'Serviço' : 'Produto'}
                               </span>
                             </div>
+                            <div className="text-right">
+                              <div className="flex items-center space-x-1">
+                                <DollarSign className="h-4 w-4 text-green-600" />
+                                <span className="font-medium text-green-600">
+                                  {formatCurrency(transaction.total_value)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Comissão: {formatCurrency(transaction.commission_value)}
+                              </div>
+                            </div>
                           </div>
                           
-                          <div className="mb-2">
-                            <span className="text-sm text-gray-600">
-                              Cliente: {appointment.client.name}
-                            </span>
-                          </div>
+                          {transaction.client_name && (
+                            <div className="mb-2">
+                              <span className="text-sm text-gray-600">
+                                Cliente: {transaction.client_name}
+                              </span>
+                            </div>
+                          )}
                           
                           <div className="flex flex-wrap gap-1">
-                            {appointment.services.map((service, index) => (
+                            {transaction.items.map((item, index) => (
                               <span
                                 key={index}
                                 className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                                  service.is_chemical
-                                    ? 'bg-purple-100 text-purple-800'
-                                    : 'bg-gray-100 text-gray-800'
+                                  transaction.type === 'appointment'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-green-100 text-green-800'
                                 }`}
                               >
-                                {service.name}
-                                {service.is_chemical && ' (Química)'}
+                                {item}
                               </span>
                             ))}
                           </div>
@@ -384,7 +527,7 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
                       ))
                     ) : (
                       <div className="text-center py-8 text-gray-500">
-                        Nenhum atendimento encontrado no período
+                        Nenhuma comissão encontrada no período
                       </div>
                     )}
                   </div>

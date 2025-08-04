@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
 import { supabase } from '../../lib/supabase';
 import { formatPhone, validateEmail } from '../../utils/formatters';
+import { toLocalDateTimeString, fromLocalDateTimeString } from '../../utils/dateHelpers';
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -61,7 +62,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   useEffect(() => {
     if (selectedDate) {
-      const dateStr = selectedDate.toISOString().slice(0, 16);
+      const dateStr = toLocalDateTimeString(selectedDate);
       setFormData(prev => ({ ...prev, appointment_datetime: dateStr }));
     }
   }, [selectedDate]);
@@ -71,7 +72,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       setFormData({
         client_id: 0,
         barber_id: user?.role === 'barber' ? user.barber?.id || 0 : 0,
-        appointment_datetime: selectedDate ? selectedDate.toISOString().slice(0, 16) : '',
+        appointment_datetime: selectedDate ? toLocalDateTimeString(selectedDate) : '',
         service_ids: [],
         note: '',
         recurrence: {
