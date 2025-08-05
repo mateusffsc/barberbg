@@ -191,14 +191,14 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     let preview = '';
     switch (rec.type) {
-      case 'daily':
-        preview = rec.interval === 1 ? 'Todos os dias' : `A cada ${rec.interval} dias`;
-        break;
       case 'weekly':
-        preview = rec.interval === 1 ? 'Toda semana' : `A cada ${rec.interval} semanas`;
+        preview = 'Toda semana';
+        break;
+      case 'biweekly':
+        preview = 'A cada 15 dias (quinzenal)';
         break;
       case 'monthly':
-        preview = rec.interval === 1 ? 'Todo mês' : `A cada ${rec.interval} meses`;
+        preview = 'Todo mês';
         break;
     }
 
@@ -434,70 +434,45 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         ...prev,
                         recurrence: {
                           ...prev.recurrence!,
-                          type: e.target.value as any
+                          type: e.target.value as any,
+                          interval: e.target.value === 'biweekly' ? 2 : 1 // Define intervalo automático para quinzenal
                         }
                       }))}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                       disabled={loading}
                     >
                       <option value="none">Sem recorrência</option>
-                      <option value="daily">Diário</option>
                       <option value="weekly">Semanal</option>
+                      <option value="biweekly">Quinzenal</option>
                       <option value="monthly">Mensal</option>
                     </select>
                   </div>
 
                   {formData.recurrence?.type !== 'none' && (
                     <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Intervalo
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="30"
-                            value={formData.recurrence?.interval || 1}
-                            onChange={(e) => setFormData(prev => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence!,
-                                interval: parseInt(e.target.value) || 1
-                              }
-                            }))}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="1"
-                            disabled={loading}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            {formData.recurrence?.type === 'daily' && 'A cada X dias'}
-                            {formData.recurrence?.type === 'weekly' && 'A cada X semanas'}
-                            {formData.recurrence?.type === 'monthly' && 'A cada X meses'}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Número de ocorrências
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="52"
-                            value={formData.recurrence?.occurrences || 1}
-                            onChange={(e) => setFormData(prev => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence!,
-                                occurrences: parseInt(e.target.value) || 1
-                              }
-                            }))}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="1"
-                            disabled={loading}
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Número de ocorrências
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="52"
+                          value={formData.recurrence?.occurrences || 1}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            recurrence: {
+                              ...prev.recurrence!,
+                              occurrences: parseInt(e.target.value) || 1
+                            }
+                          }))}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                          placeholder="1"
+                          disabled={loading}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Quantas vezes repetir este agendamento
+                        </p>
                       </div>
 
                       <div>

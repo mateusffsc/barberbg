@@ -74,7 +74,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   minTime.setHours(8, 0, 0);
   
   const maxTime = new Date();
-  maxTime.setHours(20, 0, 0);
+  maxTime.setHours(23, 59, 59); // 23:59h (quase meia-noite)
 
   // Mensagens em português
   const messages = {

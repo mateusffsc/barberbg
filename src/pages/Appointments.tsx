@@ -53,6 +53,7 @@ export const Appointments: React.FC = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [completingAll, setCompletingAll] = useState(false);
+  const [selectedBarberId, setSelectedBarberId] = useState<number | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -63,6 +64,13 @@ export const Appointments: React.FC = () => {
     const calendarEvents = convertToCalendarEvents(appointments);
     setEvents(calendarEvents);
   }, [appointments]);
+
+  useEffect(() => {
+    // Recarregar agendamentos quando o filtro de barbeiro mudar
+    if (!loading) {
+      loadAppointments();
+    }
+  }, [selectedBarberId]);
 
   const loadInitialData = async () => {
     try {
@@ -88,7 +96,9 @@ export const Appointments: React.FC = () => {
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + 30);
 
-      const result = await fetchAppointments(startDate, endDate);
+      // Passar o barbeiro selecionado para o filtro (apenas para admin)
+      const barberId = user?.role === 'admin' ? selectedBarberId : undefined;
+      const result = await fetchAppointments(startDate, endDate, barberId || undefined);
       setAppointments(result.appointments);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
@@ -286,6 +296,37 @@ export const Appointments: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Filtro de Barbeiro (apenas para admin) */}
+      {user?.role === 'admin' && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center space-x-3">
+            <label className="text-sm font-medium text-gray-700">
+              Filtrar por barbeiro:
+            </label>
+            <select
+              value={selectedBarberId || ''}
+              onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            >
+              <option value="">Todos os barbeiros</option>
+              {barbers.map((barber) => (
+                <option key={barber.id} value={barber.id}>
+                  {barber.name}
+                </option>
+              ))}
+            </select>
+            {selectedBarberId && (
+              <button
+                onClick={() => setSelectedBarberId(null)}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Limpar filtro
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Calendar */}
       <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-6">

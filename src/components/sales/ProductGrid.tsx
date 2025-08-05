@@ -20,7 +20,6 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="animate-pulse">
-              <div className="bg-gray-200 h-32 rounded-lg mb-3"></div>
               <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
               <div className="h-6 bg-gray-200 rounded w-1/2 mb-3"></div>
               <div className="h-10 bg-gray-200 rounded"></div>
@@ -50,11 +49,6 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
           key={product.id}
           className="border rounded-lg p-4 hover:shadow-lg transition-shadow bg-white"
         >
-          {/* Placeholder da imagem */}
-          <div className="h-24 bg-gray-200 rounded mb-2 flex items-center justify-center">
-            <Package className="h-8 w-8 text-gray-400" />
-          </div>
-          
           {/* Nome do produto */}
           <h3 className="font-medium text-gray-900 mb-1 truncate">
             {product.name}

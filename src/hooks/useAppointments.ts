@@ -191,14 +191,14 @@ export const useAppointments = () => {
       const nextDate = new Date(startDate);
       
       switch (recurrence.type) {
-        case 'daily':
-          nextDate.setDate(startDate.getDate() + (i * interval));
-          break;
         case 'weekly':
-          nextDate.setDate(startDate.getDate() + (i * interval * 7));
+          nextDate.setDate(startDate.getDate() + (i * 7)); // Toda semana (7 dias)
+          break;
+        case 'biweekly':
+          nextDate.setDate(startDate.getDate() + (i * 14)); // Quinzenal (14 dias)
           break;
         case 'monthly':
-          nextDate.setMonth(startDate.getMonth() + (i * interval));
+          nextDate.setMonth(startDate.getMonth() + i); // Todo mês
           break;
       }
 

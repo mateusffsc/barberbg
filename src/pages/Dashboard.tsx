@@ -85,7 +85,67 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     // Carregar dados iniciais apenas uma vez
     loadInitialData();
+
+    // Configurar listener para mudanças em agendamentos
+    const channel = supabase
+      .channel('dashboard_appointments')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'appointments',
+          filter: `appointment_datetime=gte.${new Date().toISOString().split('T')[0]}`
+        }, 
+        (payload) => {
+          console.log('Agendamento atualizado, recarregando dashboard:', payload);
+          // Recarregar apenas os dados de hoje
+          loadTodayAppointments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  const loadTodayAppointments = async () => {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+      let todayQuery = supabase
+        .from('appointments')
+        .select(`
+          *,
+          client:clients(id, name),
+          barber:barbers(id, name),
+          appointment_services(
+            service:services(id, name)
+          )
+        `)
+        .eq('status', 'scheduled')
+        .gte('appointment_datetime', today.toISOString())
+        .lte('appointment_datetime', endOfToday.toISOString());
+
+      if (user?.role === 'barber' && user.barber?.id) {
+        todayQuery = todayQuery.eq('barber_id', user.barber.id);
+      }
+
+      const { data: allTodayApts, error: todayError } = await todayQuery;
+      if (todayError) throw todayError;
+
+      const todayAppointmentsWithServices = (allTodayApts || []).map(apt => ({
+        ...apt,
+        services: apt.appointment_services?.map((as: any) => as.service) || []
+      }));
+      
+      setAllTodayAppointments(todayAppointmentsWithServices);
+    } catch (error) {
+      console.error('Erro ao recarregar agendamentos de hoje:', error);
+    }
+  };
 
   const loadInitialData = async () => {
     setLoadingModalData(true);
@@ -200,7 +260,7 @@ export const Dashboard: React.FC = () => {
       console.log('Diferença em dias:', Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
       console.log('==============================');
 
-      // 1. Buscar agendamentos de hoje para o contador
+      // 1. Buscar agendamentos de hoje para o contador (apenas scheduled)
       let todayQuery = supabase
         .from('appointments')
         .select(`
@@ -211,6 +271,7 @@ export const Dashboard: React.FC = () => {
             service:services(id, name)
           )
         `)
+        .eq('status', 'scheduled')
         .gte('appointment_datetime', today.toISOString())
         .lte('appointment_datetime', endOfToday.toISOString());
 
