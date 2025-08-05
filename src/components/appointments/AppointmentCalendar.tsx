@@ -3,6 +3,7 @@ import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import '../../styles/calendar-responsive.css';
 import { CalendarEvent, AppointmentStatus } from '../../types/appointment';
 import { AppointmentContextMenu } from './AppointmentContextMenu';
 import { AppointmentsList } from './AppointmentsList';
@@ -29,6 +30,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   const [view, setView] = useState<View>(Views.WEEK);
   const [date, setDate] = useState(new Date());
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
   const [contextMenu, setContextMenu] = useState<{
     show: boolean;
     x: number;
@@ -39,7 +41,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   // Detectar mudanças no tamanho da tela
   React.useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+      setIsTablet(width >= 768 && width < 1024);
     };
 
     window.addEventListener('resize', handleResize);
@@ -130,67 +134,71 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   // Se for mobile, mostrar lista em vez de calendário
   if (isMobile) {
     return (
-      <div className="h-full">
+      <div className="h-full flex flex-col">
         {loading && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
         )}
 
-        <div className="mb-4 flex items-center justify-between px-4">
-          <div className="flex items-center space-x-2">
+        {/* Controles de navegação mobile */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center space-x-1">
             <button
               onClick={() => setDate(new Date())}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
             >
               Hoje
             </button>
             <button
               onClick={() => setDate(moment(date).subtract(1, 'week').toDate())}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
             >
               ←
             </button>
             <button
               onClick={() => setDate(moment(date).add(1, 'week').toDate())}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
             >
               →
             </button>
           </div>
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium text-gray-900">
             {moment(date).format('MMM YYYY')}
           </span>
         </div>
 
         {/* Legenda de cores para mobile */}
-        <div className="mb-4 px-4">
-          <div className="flex flex-wrap gap-3 text-xs">
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span>Agendado</span>
+              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+              <span className="truncate">Agendado</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Concluído</span>
+              <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+              <span className="truncate">Concluído</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span>Cancelado</span>
+              <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
+              <span className="truncate">Cancelado</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-              <span>Não compareceu</span>
+              <div className="w-2 h-2 bg-gray-500 rounded-full flex-shrink-0"></div>
+              <span className="truncate">Não compareceu</span>
             </div>
           </div>
         </div>
 
-        <AppointmentsList
-          events={events}
-          onSelectEvent={onSelectEvent}
-          onContextMenu={handleContextMenu}
-          loading={loading}
-        />
+        {/* Lista de agendamentos - área scrollável */}
+        <div className="flex-1 overflow-y-auto -mx-3">
+          <AppointmentsList
+            events={events}
+            onSelectEvent={onSelectEvent}
+            onContextMenu={handleContextMenu}
+            loading={loading}
+          />
+        </div>
 
         {/* Menu de contexto */}
         <AppointmentContextMenu
@@ -234,52 +242,68 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        {/* Navegação e título */}
+        <div className="flex items-center space-x-2 overflow-x-auto">
           <button
             onClick={() => setDate(new Date())}
-            className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+            className="px-2 md:px-3 py-1 text-xs md:text-sm border border-gray-300 rounded hover:bg-gray-50 whitespace-nowrap transition-colors"
           >
             Hoje
           </button>
           <button
             onClick={() => setDate(moment(date).subtract(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}
-            className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+            className="px-2 md:px-3 py-1 text-xs md:text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             ←
           </button>
           <button
             onClick={() => setDate(moment(date).add(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}
-            className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+            className="px-2 md:px-3 py-1 text-xs md:text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             →
           </button>
-          <span className="text-lg font-medium">
+          <span className="text-sm md:text-lg font-medium text-gray-900 whitespace-nowrap">
             {view === Views.MONTH 
               ? moment(date).format('MMMM YYYY')
               : view === Views.WEEK
-              ? `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM/YYYY')}`
+              ? isTablet 
+                ? `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM')}`
+                : `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM/YYYY')}`
               : moment(date).format('DD/MM/YYYY')
             }
           </span>
         </div>
 
-        <div className="flex items-center space-x-2">
+        {/* Seletor de visualização */}
+        <div className="flex items-center space-x-1 md:space-x-2">
           <button
             onClick={() => setView(Views.MONTH)}
-            className={`px-3 py-1 text-sm rounded ${view === Views.MONTH ? 'bg-gray-900 text-white' : 'border border-gray-300 hover:bg-gray-50'}`}
+            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded transition-colors ${
+              view === Views.MONTH 
+                ? 'bg-gray-900 text-white' 
+                : 'border border-gray-300 hover:bg-gray-50'
+            }`}
           >
             Mês
           </button>
           <button
             onClick={() => setView(Views.WEEK)}
-            className={`px-3 py-1 text-sm rounded ${view === Views.WEEK ? 'bg-gray-900 text-white' : 'border border-gray-300 hover:bg-gray-50'}`}
+            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded transition-colors ${
+              view === Views.WEEK 
+                ? 'bg-gray-900 text-white' 
+                : 'border border-gray-300 hover:bg-gray-50'
+            }`}
           >
             Semana
           </button>
           <button
             onClick={() => setView(Views.DAY)}
-            className={`px-3 py-1 text-sm rounded ${view === Views.DAY ? 'bg-gray-900 text-white' : 'border border-gray-300 hover:bg-gray-50'}`}
+            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded transition-colors ${
+              view === Views.DAY 
+                ? 'bg-gray-900 text-white' 
+                : 'border border-gray-300 hover:bg-gray-50'
+            }`}
           >
             Dia
           </button>
@@ -287,26 +311,32 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
       </div>
 
       {/* Legenda de cores */}
-      <div className="mb-4 flex items-center space-x-4 text-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm">
         <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-blue-500 rounded"></div>
-          <span>Agendado</span>
+          <div className="w-2 h-2 md:w-3 md:h-3 bg-blue-500 rounded flex-shrink-0"></div>
+          <span className="whitespace-nowrap">Agendado</span>
         </div>
         <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-green-500 rounded"></div>
-          <span>Concluído</span>
+          <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded flex-shrink-0"></div>
+          <span className="whitespace-nowrap">Concluído</span>
         </div>
         <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span>Cancelado</span>
+          <div className="w-2 h-2 md:w-3 md:h-3 bg-red-500 rounded flex-shrink-0"></div>
+          <span className="whitespace-nowrap">Cancelado</span>
         </div>
         <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-gray-500 rounded"></div>
-          <span>Não compareceu</span>
+          <div className="w-2 h-2 md:w-3 md:h-3 bg-gray-500 rounded flex-shrink-0"></div>
+          <span className="whitespace-nowrap">Não compareceu</span>
         </div>
       </div>
 
-      <div style={{ height: 'calc(100vh - 300px)' }}>
+      <div 
+        className="flex-1 min-h-0"
+        style={{ 
+          height: isTablet ? 'calc(100vh - 350px)' : 'calc(100vh - 300px)',
+          minHeight: '400px'
+        }}
+      >
         <Calendar
           localizer={localizer}
           events={events}
@@ -321,8 +351,8 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           onEventDrop={handleEventDrop}
           eventPropGetter={eventStyleGetter}
           selectable
-          resizable
-          dragAndDropAccessor={() => true}
+          resizable={!isTablet}
+          dragAndDropAccessor={() => !isTablet}
           messages={messages}
           formats={formats}
           min={minTime}
@@ -335,14 +365,16 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             event: ({ event }) => (
               <div
                 onContextMenu={(e) => handleContextMenu(event, e)}
-                className="cursor-pointer"
+                className="cursor-pointer p-1"
               >
                 <div className="font-medium text-xs truncate">
                   {event.resource.client}
                 </div>
-                <div className="text-xs opacity-90 truncate">
-                  {event.resource.services.join(', ')}
-                </div>
+                {!isTablet && (
+                  <div className="text-xs opacity-90 truncate">
+                    {event.resource.services.join(', ')}
+                  </div>
+                )}
               </div>
             )
           }}

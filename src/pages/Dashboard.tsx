@@ -633,8 +633,11 @@ export const Dashboard: React.FC = () => {
 
   if (loadingData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-64 p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Carregando dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -667,13 +670,13 @@ export const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Bem-vindo, {user?.username}!
         </h1>
         <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-500">
+          <div className="text-xs sm:text-sm text-gray-500">
             {new Date().toLocaleDateString('pt-BR', {
               weekday: 'long',
               year: 'numeric',
@@ -685,7 +688,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Botões de Atalho */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <button
           onClick={() => {
             console.log('Abrindo modal de agendamento. Dados disponíveis:', {
@@ -695,7 +698,7 @@ export const Dashboard: React.FC = () => {
             });
             setShowAppointmentModal(true);
           }}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors text-sm sm:text-base"
         >
           <Plus className="h-4 w-4" />
           Novo Agendamento
@@ -708,7 +711,7 @@ export const Dashboard: React.FC = () => {
             });
             setShowSaleModal(true);
           }}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors text-sm sm:text-base"
         >
           <ShoppingCart className="h-4 w-4" />
           Vender Produto
@@ -716,18 +719,18 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Filtros de Período */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">Período:</span>
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 sm:flex gap-2">
             {Object.entries(periods).map(([key, period]) => (
               <button
                 key={key}
                 onClick={() => setSelectedPeriod(key as typeof selectedPeriod)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-2 sm:py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                   selectedPeriod === key
                     ? 'bg-blue-100 text-blue-700 border border-blue-300'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -741,21 +744,21 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
               key={stat.name}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center">
-                <div className={`${stat.color} rounded-lg p-3`}>
-                  <Icon className="h-6 w-6 text-white" />
+                <div className={`${stat.color} rounded-lg p-2 sm:p-3`}>
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{stat.name}</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{stat.value}</p>
                 </div>
               </div>
             </div>
@@ -764,25 +767,25 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
             Próximos Agendamentos (7 dias)
           </h2>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {todayAppointments.length > 0 ? (
               todayAppointments.map((appointment) => (
-                <div key={appointment.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-gray-700">
+                <div key={appointment.id} className="flex items-center space-x-3 sm:space-x-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs sm:text-sm font-medium text-gray-700">
                       {getInitials(appointment.client?.name || 'Cliente')}
                     </span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
                       {appointment.client?.name || 'Cliente'}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 truncate">
                       {appointment.services?.map(s => s.name).join(' + ') || 'Serviço'}
                     </p>
                     <p className="text-xs text-blue-600 font-medium">
@@ -792,7 +795,7 @@ export const Dashboard: React.FC = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center py-4 text-gray-500">
+              <div className="text-center py-6 sm:py-4 text-gray-500">
                 <p className="text-sm">Nenhum agendamento próximo</p>
                 <p className="text-xs">Os próximos agendamentos aparecerão aqui</p>
               </div>
@@ -800,23 +803,23 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
             Vendas Recentes
           </h2>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {recentSales.length > 0 ? (
               recentSales.map((sale) => (
                 <div key={sale.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="text-sm font-medium text-gray-900 truncate">
                       {sale.products?.map(p => p.name).join(', ') || 'Produtos'}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 truncate">
                       Cliente: {sale.client?.name || 'Sem cliente'}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <p className="text-sm font-bold text-green-600">
                       {formatCurrency(sale.total_amount)}
                     </p>
@@ -827,7 +830,7 @@ export const Dashboard: React.FC = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center py-4 text-gray-500">
+              <div className="text-center py-6 sm:py-4 text-gray-500">
                 <p className="text-sm">Nenhuma venda recente</p>
                 <p className="text-xs">As vendas recentes aparecerão aqui</p>
               </div>
@@ -852,11 +855,11 @@ export const Dashboard: React.FC = () => {
 
       {/* Modal de Nova Venda */}
       {showSaleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Nova Venda</h2>
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Nova Venda</h2>
               <button
                 onClick={handleCloseModals}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -867,16 +870,16 @@ export const Dashboard: React.FC = () => {
 
             {/* Content */}
             <div className="flex-1 overflow-hidden">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 h-full">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6 h-full">
                 {/* Produtos */}
                 <div className="lg:col-span-2 overflow-y-auto">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
                     Produtos ({products.length} encontrados)
                   </h3>
                   {loadingModalData ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                      <span className="ml-2 text-gray-600">Carregando produtos...</span>
+                    <div className="flex items-center justify-center py-8 sm:py-12">
+                      <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-sm sm:text-base text-gray-600">Carregando produtos...</span>
                     </div>
                   ) : (
                     <ProductGrid

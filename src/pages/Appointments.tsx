@@ -248,17 +248,17 @@ export const Appointments: React.FC = () => {
   const isLoading = loading;
 
   return (
-    <div className="h-full flex flex-col space-y-6">
+    <div className="h-full flex flex-col space-y-4 md:space-y-6 p-4 md:p-0">
       <Toaster position="top-right" />
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            <Calendar className="h-6 w-6 mr-2" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center">
+            <Calendar className="h-5 w-5 md:h-6 md:w-6 mr-2" />
             {user?.role === 'admin' ? 'Agendamentos' : 'Meus Agendamentos'}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm md:text-base text-gray-600 mt-1">
             {user?.role === 'admin' 
               ? 'Gerencie todos os agendamentos da barbearia'
               : 'Seus agendamentos e horários'
@@ -266,70 +266,78 @@ export const Appointments: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={loadAppointments}
-            disabled={isLoading}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Atualizar
-          </button>
+        {/* Botões de ação - Layout responsivo */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className="flex gap-2">
+            <button
+              onClick={loadAppointments}
+              disabled={isLoading}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Atualizar</span>
+              <span className="sm:hidden">Sync</span>
+            </button>
+            
+            <button
+              onClick={handleNewAppointment}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Novo Agendamento</span>
+              <span className="sm:hidden">Novo</span>
+            </button>
+          </div>
           
           {getTodayScheduledCount() > 0 && (
             <button
               onClick={handleCompleteAllToday}
               disabled={completingAll || isLoading}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
-              Concluir Todos Hoje ({getTodayScheduledCount()})
+              <span className="hidden md:inline">Concluir Todos Hoje ({getTodayScheduledCount()})</span>
+              <span className="md:hidden">Concluir Hoje ({getTodayScheduledCount()})</span>
             </button>
           )}
-          
-          <button
-            onClick={handleNewAppointment}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Agendamento
-          </button>
         </div>
       </div>
 
       {/* Filtro de Barbeiro (apenas para admin) */}
       {user?.role === 'admin' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center space-x-3">
-            <label className="text-sm font-medium text-gray-700">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
               Filtrar por barbeiro:
             </label>
-            <select
-              value={selectedBarberId || ''}
-              onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            >
-              <option value="">Todos os barbeiros</option>
-              {barbers.map((barber) => (
-                <option key={barber.id} value={barber.id}>
-                  {barber.name}
-                </option>
-              ))}
-            </select>
-            {selectedBarberId && (
-              <button
-                onClick={() => setSelectedBarberId(null)}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
+            <div className="flex flex-1 items-center gap-2">
+              <select
+                value={selectedBarberId || ''}
+                onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
+                className="flex-1 sm:flex-none sm:min-w-48 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               >
-                Limpar filtro
-              </button>
-            )}
+                <option value="">Todos os barbeiros</option>
+                {barbers.map((barber) => (
+                  <option key={barber.id} value={barber.id}>
+                    {barber.name}
+                  </option>
+                ))}
+              </select>
+              {selectedBarberId && (
+                <button
+                  onClick={() => setSelectedBarberId(null)}
+                  className="text-sm text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Calendar */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-6 min-h-0">
         <AppointmentCalendar
           events={events}
           onSelectSlot={handleSelectSlot}

@@ -109,8 +109,8 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
         return (
           <div key={dateKey}>
             {/* Cabeçalho da data */}
-            <div className="sticky top-0 bg-gray-50 px-4 py-2 border-b border-gray-200 mb-4">
-              <h3 className="text-sm font-medium text-gray-900">
+            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 mb-3 rounded-t-lg">
+              <h3 className="text-sm font-medium text-gray-900 capitalize">
                 {date.toLocaleDateString('pt-BR', {
                   weekday: 'long',
                   day: '2-digit',
@@ -123,24 +123,24 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
             </div>
 
             {/* Cards dos agendamentos */}
-            <div className="space-y-3 px-4">
+            <div className="space-y-3 px-3">
               {dateEvents.map(event => (
                 <div
                   key={event.id}
-                  className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
                   onClick={() => onSelectEvent(event)}
                 >
-                  <div className="p-4">
+                  <div className="p-3">
                     {/* Header do card */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-900">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <Clock className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-900 truncate">
                           {formatTime(event.start)} - {formatTime(event.end)}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(event.resource.status)}`}>
+                      <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(event.resource.status)}`}>
                           {getStatusText(event.resource.status)}
                         </span>
                         <button
@@ -148,27 +148,30 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                             e.stopPropagation();
                             onContextMenu(event, e);
                           }}
-                          className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                          className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
 
-                    {/* Informações do cliente */}
-                    <div className="flex items-center space-x-2 mb-2">
-                      <User className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-900">
-                        {event.resource.client}
-                      </span>
-                    </div>
+                    {/* Informações principais */}
+                    <div className="space-y-2 mb-3">
+                      {/* Cliente */}
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {event.resource.client}
+                        </span>
+                      </div>
 
-                    {/* Informações do barbeiro */}
-                    <div className="flex items-center space-x-2 mb-3">
-                      <UserCheck className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">
-                        {event.resource.barber}
-                      </span>
+                      {/* Barbeiro */}
+                      <div className="flex items-center space-x-2">
+                        <UserCheck className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 truncate">
+                          {event.resource.barber}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Serviços */}
@@ -177,7 +180,7 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                         {event.resource.services.map((service, index) => (
                           <span
                             key={index}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
+                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 max-w-full truncate"
                           >
                             {service}
                           </span>
@@ -185,15 +188,15 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                       </div>
                     </div>
 
-                    {/* Total */}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    {/* Footer com total e duração */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                       <div className="flex items-center space-x-1">
-                        <DollarSign className="h-4 w-4 text-green-600" />
+                        <DollarSign className="h-4 w-4 text-green-600 flex-shrink-0" />
                         <span className="text-sm font-medium text-green-600">
                           {formatCurrency(event.resource.total)}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 flex-shrink-0">
                         {Math.round((event.end.getTime() - event.start.getTime()) / 60000)} min
                       </span>
                     </div>
