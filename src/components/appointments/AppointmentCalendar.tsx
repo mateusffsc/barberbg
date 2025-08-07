@@ -4,12 +4,19 @@ import moment from 'moment';
 import 'moment/locale/pt-br';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../../styles/calendar-responsive.css';
-import { CalendarEvent, AppointmentStatus } from '../../types/appointment';
+import { CalendarEvent } from '../../types/appointment';
 import { AppointmentContextMenu } from './AppointmentContextMenu';
 import { AppointmentsList } from './AppointmentsList';
 
 // Configurar moment para português brasileiro
 moment.locale('pt-br');
+moment.updateLocale('pt-br', {
+  months: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+  monthsShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+  weekdays: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
+  weekdaysShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+  weekdaysMin: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+});
 const localizer = momentLocalizer(moment);
 
 interface AppointmentCalendarProps {
@@ -17,6 +24,8 @@ interface AppointmentCalendarProps {
   onSelectSlot: (slotInfo: { start: Date; end: Date }) => void;
   onSelectEvent: (event: CalendarEvent) => void;
   onEventDrop: (event: CalendarEvent, start: Date, end: Date) => void;
+  onStatusChange: (appointmentId: number, newStatus: string) => void;
+  onCompleteWithPayment: (event: CalendarEvent) => void;
   loading?: boolean;
 }
 
@@ -25,6 +34,8 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onSelectSlot,
   onSelectEvent,
   onEventDrop,
+  onStatusChange,
+  onCompleteWithPayment,
   loading = false
 }) => {
   const [view, setView] = useState<View>(Views.WEEK);
@@ -53,22 +64,42 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   // Configuração de cores por status
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     const colors = {
-      scheduled: { backgroundColor: '#3b82f6', borderColor: '#2563eb' }, // Azul
-      completed: { backgroundColor: '#10b981', borderColor: '#059669' }, // Verde
-      cancelled: { backgroundColor: '#ef4444', borderColor: '#dc2626' }, // Vermelho
-      no_show: { backgroundColor: '#6b7280', borderColor: '#4b5563' }     // Cinza
+      scheduled: { 
+        backgroundColor: '#3b82f6', 
+        borderColor: '#2563eb',
+        textColor: 'white'
+      }, // Azul
+      completed: { 
+        backgroundColor: '#10b981', 
+        borderColor: '#059669',
+        textColor: 'white'
+      }, // Verde
+      cancelled: { 
+        backgroundColor: '#ef4444', 
+        borderColor: '#dc2626',
+        textColor: 'white'
+      }, // Vermelho
+      no_show: { 
+        backgroundColor: '#6b7280', 
+        borderColor: '#4b5563',
+        textColor: 'white'
+      }     // Cinza
     };
 
     const color = colors[event.resource.status] || colors.scheduled;
 
     return {
       style: {
-        ...color,
-        color: 'white',
-        border: `2px solid ${color.borderColor}`,
-        borderRadius: '4px',
+        backgroundColor: color.backgroundColor,
+        borderColor: color.borderColor,
+        color: color.textColor,
+        border: `1px solid ${color.borderColor}`,
+        borderRadius: '6px',
         fontSize: '12px',
-        padding: '2px 4px'
+        padding: '4px 6px',
+        fontWeight: '500',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        opacity: '1'
       }
     };
   }, []);
@@ -76,7 +107,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   // Configuração de horário comercial
   const minTime = new Date();
   minTime.setHours(8, 0, 0);
-  
+
   const maxTime = new Date();
   maxTime.setHours(23, 59, 59); // 23:59h (quase meia-noite)
 
@@ -100,11 +131,18 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   // Formatos de data em português
   const formats = {
     monthHeaderFormat: 'MMMM YYYY',
-    dayHeaderFormat: 'dddd, DD/MM',
+    dayHeaderFormat: (date: Date) => moment(date).format('ddd'),
+    weekdayFormat: (date: Date) => moment(date).format('ddd'),
     dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
       `${moment(start).format('DD/MM')} - ${moment(end).format('DD/MM/YYYY')}`,
     timeGutterFormat: 'HH:mm',
     eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')}`,
+    dayFormat: 'DD',
+    dateFormat: 'DD',
+    agendaDateFormat: 'DD/MM/YYYY',
+    agendaTimeFormat: 'HH:mm',
+    agendaTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
       `${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')}`
   };
 
@@ -131,8 +169,25 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     onEventDrop(event, start, end);
   };
 
-  // Se for mobile, mostrar lista em vez de calendário
-  if (isMobile) {
+  // Filtrar eventos por período selecionado
+  const getFilteredEvents = () => {
+    if (view === Views.WEEK || view === Views.DAY) {
+      const startOfPeriod = view === Views.WEEK 
+        ? moment(date).startOf('week').toDate()
+        : moment(date).startOf('day').toDate();
+      const endOfPeriod = view === Views.WEEK 
+        ? moment(date).endOf('week').toDate()
+        : moment(date).endOf('day').toDate();
+      
+      return events.filter(event => 
+        event.start >= startOfPeriod && event.start <= endOfPeriod
+      );
+    }
+    return events;
+  };
+
+  // Se for mobile ou visualização de semana/dia, mostrar lista em vez de calendário
+  if (isMobile || view === Views.WEEK || view === Views.DAY) {
     return (
       <div className="h-full flex flex-col">
         {loading && (
@@ -141,34 +196,76 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           </div>
         )}
 
-        {/* Controles de navegação mobile */}
+        {/* Controles de navegação */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setDate(new Date())}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
             >
               Hoje
             </button>
             <button
-              onClick={() => setDate(moment(date).subtract(1, 'week').toDate())}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              onClick={() => setDate(moment(date).subtract(1, view === Views.DAY ? 'day' : 'week').toDate())}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
             >
-              ←
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
             <button
-              onClick={() => setDate(moment(date).add(1, 'week').toDate())}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              onClick={() => setDate(moment(date).add(1, view === Views.DAY ? 'day' : 'week').toDate())}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
             >
-              →
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
-          <span className="text-sm font-medium text-gray-900">
-            {moment(date).format('MMM YYYY')}
-          </span>
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setView(Views.MONTH)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${view === Views.MONTH
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+              Mês
+            </button>
+            <button
+              onClick={() => setView(Views.WEEK)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${view === Views.WEEK
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => setView(Views.DAY)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${view === Views.DAY
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+              Dia
+            </button>
+          </div>
         </div>
 
-        {/* Legenda de cores para mobile */}
+        {/* Título do período */}
+        <div className="mb-4 text-center">
+          <h2 className="text-lg font-bold text-gray-900">
+            {view === Views.DAY
+              ? moment(date).format('dddd, DD [de] MMMM [de] YYYY')
+              : view === Views.WEEK
+                ? `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM/YYYY')}`
+                : moment(date).format('MMMM YYYY')
+            }
+          </h2>
+        </div>
+
+        {/* Legenda de cores */}
         <div className="mb-4">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center space-x-1">
@@ -193,7 +290,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         {/* Lista de agendamentos - área scrollável */}
         <div className="flex-1 overflow-y-auto -mx-3">
           <AppointmentsList
-            events={events}
+            events={getFilteredEvents()}
             onSelectEvent={onSelectEvent}
             onContextMenu={handleContextMenu}
             loading={loading}
@@ -208,7 +305,15 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           event={contextMenu.event}
           onClose={closeContextMenu}
           onStatusChange={(status) => {
-            // Implementar mudança de status
+            if (contextMenu.event) {
+              onStatusChange(contextMenu.event.resource.appointment.id, status);
+            }
+            closeContextMenu();
+          }}
+          onCompleteWithPayment={() => {
+            if (contextMenu.event) {
+              onCompleteWithPayment(contextMenu.event);
+            }
             closeContextMenu();
           }}
           onEdit={() => {
@@ -242,68 +347,73 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         </div>
       )}
 
-      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="mb-1 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
         {/* Navegação e título */}
-        <div className="flex items-center space-x-2 overflow-x-auto">
+        <div className="flex items-center space-x-3 overflow-x-auto">
           <button
             onClick={() => setDate(new Date())}
-            className="px-2 md:px-3 py-1 text-xs md:text-sm border border-gray-300 rounded hover:bg-gray-50 whitespace-nowrap transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 whitespace-nowrap transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
           >
             Hoje
           </button>
-          <button
-            onClick={() => setDate(moment(date).subtract(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}
-            className="px-2 md:px-3 py-1 text-xs md:text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-          >
-            ←
-          </button>
-          <button
-            onClick={() => setDate(moment(date).add(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}
-            className="px-2 md:px-3 py-1 text-xs md:text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-          >
-            →
-          </button>
-          <span className="text-sm md:text-lg font-medium text-gray-900 whitespace-nowrap">
-            {view === Views.MONTH 
-              ? moment(date).format('MMMM YYYY')
-              : view === Views.WEEK
-              ? isTablet 
-                ? `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM')}`
-                : `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM/YYYY')}`
-              : moment(date).format('DD/MM/YYYY')
-            }
-          </span>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setDate(moment(date).subtract(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setDate(moment(date).add(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 text-center">
+            <h2 className="text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">
+              {view === Views.MONTH
+                ? moment(date).format('MMMM YYYY')
+                : view === Views.WEEK
+                  ? isTablet
+                    ? `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM')}`
+                    : `${moment(date).startOf('week').format('DD/MM')} - ${moment(date).endOf('week').format('DD/MM/YYYY')}`
+                  : moment(date).format('DD/MM/YYYY')
+              }
+            </h2>
+          </div>
         </div>
 
         {/* Seletor de visualização */}
-        <div className="flex items-center space-x-1 md:space-x-2">
+        <div className="flex items-center bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setView(Views.MONTH)}
-            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded transition-colors ${
-              view === Views.MONTH 
-                ? 'bg-gray-900 text-white' 
-                : 'border border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${view === Views.MONTH
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
           >
             Mês
           </button>
           <button
             onClick={() => setView(Views.WEEK)}
-            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded transition-colors ${
-              view === Views.WEEK 
-                ? 'bg-gray-900 text-white' 
-                : 'border border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${view === Views.WEEK
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
           >
             Semana
           </button>
           <button
             onClick={() => setView(Views.DAY)}
-            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded transition-colors ${
-              view === Views.DAY 
-                ? 'bg-gray-900 text-white' 
-                : 'border border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${view === Views.DAY
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
           >
             Dia
           </button>
@@ -311,30 +421,32 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
       </div>
 
       {/* Legenda de cores */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm">
-        <div className="flex items-center space-x-1">
-          <div className="w-2 h-2 md:w-3 md:h-3 bg-blue-500 rounded flex-shrink-0"></div>
-          <span className="whitespace-nowrap">Agendado</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded flex-shrink-0"></div>
-          <span className="whitespace-nowrap">Concluído</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-2 h-2 md:w-3 md:h-3 bg-red-500 rounded flex-shrink-0"></div>
-          <span className="whitespace-nowrap">Cancelado</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-2 h-2 md:w-3 md:h-3 bg-gray-500 rounded flex-shrink-0"></div>
-          <span className="whitespace-nowrap">Não compareceu</span>
+      <div className="mb-1 bg-gray-50 rounded-lg p-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 text-xs">
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2.5 h-2.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-sm"></div>
+            <span className="font-medium text-gray-700">Agendado</span>
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2.5 h-2.5 bg-gradient-to-r from-green-500 to-green-600 rounded-full shadow-sm"></div>
+            <span className="font-medium text-gray-700">Concluído</span>
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2.5 h-2.5 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm"></div>
+            <span className="font-medium text-gray-700">Cancelado</span>
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2.5 h-2.5 bg-gradient-to-r from-gray-500 to-gray-600 rounded-full shadow-sm"></div>
+            <span className="font-medium text-gray-700">Não compareceu</span>
+          </div>
         </div>
       </div>
 
-      <div 
+      <div
         className="flex-1 min-h-0"
-        style={{ 
-          height: isTablet ? 'calc(100vh - 350px)' : 'calc(100vh - 300px)',
-          minHeight: '400px'
+        style={{
+          height: isTablet ? 'calc(100vh - 200px)' : 'calc(100vh - 160px)',
+          minHeight: '600px'
         }}
       >
         <Calendar
@@ -365,13 +477,14 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             event: ({ event }) => (
               <div
                 onContextMenu={(e) => handleContextMenu(event, e)}
-                className="cursor-pointer p-1"
+                className="cursor-pointer p-1 h-full"
+                data-status={event.resource.status}
               >
-                <div className="font-medium text-xs truncate">
+                <div className="font-semibold text-xs truncate leading-tight">
                   {event.resource.client}
                 </div>
                 {!isTablet && (
-                  <div className="text-xs opacity-90 truncate">
+                  <div className="text-xs opacity-90 truncate leading-tight mt-0.5">
                     {event.resource.services.join(', ')}
                   </div>
                 )}
@@ -389,7 +502,15 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         event={contextMenu.event}
         onClose={closeContextMenu}
         onStatusChange={(status) => {
-          // Implementar mudança de status
+          if (contextMenu.event) {
+            onStatusChange(contextMenu.event.resource.appointment.id, status);
+          }
+          closeContextMenu();
+        }}
+        onCompleteWithPayment={() => {
+          if (contextMenu.event) {
+            onCompleteWithPayment(contextMenu.event);
+          }
           closeContextMenu();
         }}
         onEdit={() => {

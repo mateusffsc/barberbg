@@ -35,6 +35,7 @@ const menuItems: MenuItem[] = [
   { name: 'Vendas', path: '/vendas', icon: ShoppingCart, roles: ['admin', 'barber'] },
   { name: 'Despesas', path: '/despesas', icon: Receipt, roles: ['admin'] },
   { name: 'Relatórios', path: '/relatorios', icon: BarChart3, roles: ['admin'] },
+  { name: 'Minhas Comissões', path: '/minhas-comissoes', icon: BarChart3, roles: ['barber'] },
 ];
 
 export const Layout: React.FC = () => {

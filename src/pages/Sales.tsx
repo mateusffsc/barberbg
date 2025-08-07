@@ -8,11 +8,11 @@ import { ProductGrid } from '../components/sales/ProductGrid';
 import { ShoppingCart as Cart } from '../components/sales/ShoppingCart';
 import { SalesTable } from '../components/sales/SalesTable';
 import { Pagination } from '../components/ui/Pagination';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CartItem } from '../types/sale';
 import { Product } from '../types/product';
 import { Client } from '../types/client';
 import { Barber } from '../types/barber';
+import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -54,7 +54,6 @@ export const Sales: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [saleLoading, setSaleLoading] = useState(false);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'pdv' | 'historico'>('pdv');
   const [currentPage, setCurrentPage] = useState(1);
   const [salesSearch, setSalesSearch] = useState('');
@@ -208,7 +207,7 @@ export const Sales: React.FC = () => {
     toast.success('Item removido do carrinho');
   };
 
-  const handleFinalizeSale = () => {
+  const handleFinalizeSale = async (paymentMethod: PaymentMethod) => {
     if (cartItems.length === 0) {
       toast.error('Carrinho está vazio');
       return;
@@ -219,18 +218,13 @@ export const Sales: React.FC = () => {
       return;
     }
 
-    setIsConfirmDialogOpen(true);
-  };
-
-  const handleConfirmSale = async () => {
-    if (!selectedBarber) return;
-
     setSaleLoading(true);
     try {
       const sale = await createSale(
         cartItems,
         selectedClient?.id || null,
-        selectedBarber
+        selectedBarber,
+        paymentMethod
       );
 
       if (sale) {
@@ -243,11 +237,13 @@ export const Sales: React.FC = () => {
         
         toast.success('Venda finalizada com sucesso!');
       }
+    } catch (error) {
+      toast.error('Erro ao finalizar venda');
     } finally {
       setSaleLoading(false);
-      setIsConfirmDialogOpen(false);
     }
   };
+
 
   const total = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
 
@@ -422,17 +418,6 @@ export const Sales: React.FC = () => {
         </>
       )}
 
-      {/* Confirmação de venda */}
-      <ConfirmDialog
-        isOpen={isConfirmDialogOpen}
-        onClose={() => setIsConfirmDialogOpen(false)}
-        onConfirm={handleConfirmSale}
-        title="Finalizar Venda"
-        message={`Confirma a venda de ${cartItems.length} ${cartItems.length === 1 ? 'item' : 'itens'} no valor total de R$ ${total.toFixed(2).replace('.', ',')}?`}
-        confirmText="Finalizar"
-        type="info"
-        loading={saleLoading}
-      />
     </div>
   );
 };

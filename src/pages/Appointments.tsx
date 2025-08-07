@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, RefreshCw, Search, CheckCircle2 } from 'lucide-react';
+import { Calendar, Plus, RefreshCw, CheckCircle2, History } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { useClients } from '../hooks/useClients';
 import { useBarbers } from '../hooks/useBarbers';
@@ -7,7 +7,10 @@ import { useServices } from '../hooks/useServices';
 import { AppointmentCalendar } from '../components/appointments/AppointmentCalendar';
 import { AppointmentModal } from '../components/appointments/AppointmentModal';
 import { AppointmentDetailsModal } from '../components/appointments/AppointmentDetailsModal';
+import { AppointmentHistory } from '../components/appointments/AppointmentHistory';
+import { PaymentMethodModal } from '../components/ui/PaymentMethodModal';
 import { CalendarEvent } from '../types/appointment';
+import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
@@ -17,7 +20,6 @@ export const Appointments: React.FC = () => {
   const {
     appointments,
     setAppointments,
-    loading: appointmentsLoading,
     fetchAppointments,
     createAppointment,
     updateAppointmentStatus,
@@ -27,21 +29,18 @@ export const Appointments: React.FC = () => {
   const {
     clients,
     setClients,
-    loading: clientsLoading,
     fetchClients
   } = useClients();
 
   const {
     barbers,
     setBarbers,
-    loading: barbersLoading,
     fetchBarbers
   } = useBarbers();
 
   const {
     services,
     setServices,
-    loading: servicesLoading,
     fetchServices
   } = useServices();
 
@@ -54,6 +53,9 @@ export const Appointments: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [completingAll, setCompletingAll] = useState(false);
   const [selectedBarberId, setSelectedBarberId] = useState<number | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [appointmentToComplete, setAppointmentToComplete] = useState<CalendarEvent | null>(null);
+  const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar');
 
   useEffect(() => {
     loadInitialData();
@@ -169,9 +171,9 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (appointmentId: number, newStatus: string) => {
+  const handleStatusChange = async (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod) => {
     try {
-      const success = await updateAppointmentStatus(appointmentId, newStatus);
+      const success = await updateAppointmentStatus(appointmentId, newStatus, paymentMethod);
       if (success) {
         await loadAppointments();
         // Atualizar o evento selecionado se for o mesmo
@@ -183,6 +185,25 @@ export const Appointments: React.FC = () => {
     } catch (error) {
       console.error('Erro ao alterar status:', error);
       throw error;
+    }
+  };
+
+  const handleCompleteWithPayment = (event: CalendarEvent) => {
+    setAppointmentToComplete(event);
+    setPaymentModalOpen(true);
+  };
+
+  const handlePaymentSelection = async (paymentMethod: PaymentMethod) => {
+    if (!appointmentToComplete) return;
+
+    try {
+      await handleStatusChange(appointmentToComplete.resource.appointment.id, 'completed', paymentMethod);
+      toast.success('Agendamento finalizado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao finalizar agendamento');
+    } finally {
+      setPaymentModalOpen(false);
+      setAppointmentToComplete(null);
     }
   };
 
@@ -210,7 +231,7 @@ export const Appointments: React.FC = () => {
       if (fetchError) throw fetchError;
 
       if (!todayAppointments || todayAppointments.length === 0) {
-        toast.info('Nenhum agendamento pendente encontrado para hoje');
+        toast.error('Nenhum agendamento pendente encontrado para hoje');
         return;
       }
 
@@ -236,116 +257,156 @@ export const Appointments: React.FC = () => {
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-    
+
     return appointments.filter(apt => {
       const aptDate = new Date(apt.appointment_datetime);
-      return apt.status === 'scheduled' && 
-             aptDate >= startOfDay && 
-             aptDate <= endOfDay;
+      return apt.status === 'scheduled' &&
+        aptDate >= startOfDay &&
+        aptDate <= endOfDay;
     }).length;
   };
 
   const isLoading = loading;
 
   return (
-    <div className="h-full flex flex-col space-y-4 md:space-y-6 p-4 md:p-0">
+    <div className="h-full flex flex-col space-y-2" style={{ minHeight: '100vh', paddingBottom: '1rem' }}>
       <Toaster position="top-right" />
-      
+
       {/* Header */}
-      <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center">
-            <Calendar className="h-5 w-5 md:h-6 md:w-6 mr-2" />
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+            <Calendar className="h-6 w-6 mr-2" />
             {user?.role === 'admin' ? 'Agendamentos' : 'Meus Agendamentos'}
           </h1>
-          <p className="text-sm md:text-base text-gray-600 mt-1">
-            {user?.role === 'admin' 
+          <p className="text-gray-600">
+            {user?.role === 'admin'
               ? 'Gerencie todos os agendamentos da barbearia'
               : 'Seus agendamentos e horários'
             }
           </p>
         </div>
-        
-        {/* Botões de ação - Layout responsivo */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <div className="flex gap-2">
-            <button
-              onClick={loadAppointments}
-              disabled={isLoading}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 md:px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar</span>
-              <span className="sm:hidden">Sync</span>
-            </button>
-            
-            <button
-              onClick={handleNewAppointment}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Novo Agendamento</span>
-              <span className="sm:hidden">Novo</span>
-            </button>
-          </div>
-          
-          {getTodayScheduledCount() > 0 && (
-            <button
-              onClick={handleCompleteAllToday}
-              disabled={completingAll || isLoading}
-              className="inline-flex items-center justify-center px-3 md:px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
-              <span className="hidden md:inline">Concluir Todos Hoje ({getTodayScheduledCount()})</span>
-              <span className="md:hidden">Concluir Hoje ({getTodayScheduledCount()})</span>
-            </button>
+
+        <div className="flex items-center space-x-3">
+          {activeTab === 'calendar' && (
+            <>
+              <button
+                onClick={loadAppointments}
+                disabled={isLoading}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+
+              {getTodayScheduledCount() > 0 && (
+                <button
+                  onClick={handleCompleteAllToday}
+                  disabled={completingAll || isLoading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
+                  Concluir Todos Hoje ({getTodayScheduledCount()})
+                </button>
+              )}
+
+              <button
+                onClick={handleNewAppointment}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Agendamento
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Filtro de Barbeiro (apenas para admin) */}
-      {user?.role === 'admin' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <nav className="flex space-x-8 px-6" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'calendar'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Agenda</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'history'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <History className="h-4 w-4" />
+              <span>Histórico</span>
+            </div>
+          </button>
+        </nav>
+      </div>
+
+      {/* Filtro de Barbeiro (apenas para admin e tab agenda) */}
+      {user?.role === 'admin' && activeTab === 'calendar' && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2">
+          <div className="flex items-center space-x-3">
+            <label className="text-sm font-medium text-gray-700">
               Filtrar por barbeiro:
             </label>
-            <div className="flex flex-1 items-center gap-2">
-              <select
-                value={selectedBarberId || ''}
-                onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
-                className="flex-1 sm:flex-none sm:min-w-48 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            <select
+              value={selectedBarberId || ''}
+              onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            >
+              <option value="">Todos os barbeiros</option>
+              {barbers.map((barber) => (
+                <option key={barber.id} value={barber.id}>
+                  {barber.name}
+                </option>
+              ))}
+            </select>
+            {selectedBarberId && (
+              <button
+                onClick={() => setSelectedBarberId(null)}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
               >
-                <option value="">Todos os barbeiros</option>
-                {barbers.map((barber) => (
-                  <option key={barber.id} value={barber.id}>
-                    {barber.name}
-                  </option>
-                ))}
-              </select>
-              {selectedBarberId && (
-                <button
-                  onClick={() => setSelectedBarberId(null)}
-                  className="text-sm text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
+                Limpar filtro
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Calendar */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-6 min-h-0">
-        <AppointmentCalendar
-          events={events}
-          onSelectSlot={handleSelectSlot}
-          onSelectEvent={handleSelectEvent}
-          onEventDrop={handleEventDrop}
-          loading={isLoading}
-        />
-      </div>
+      {/* Content */}
+      {activeTab === 'calendar' ? (
+        <div className="flex-1 bg-white rounded-xl shadow-lg border border-gray-100 p-4 min-h-0 relative overflow-hidden" style={{ minHeight: '700px', height: 'calc(100vh - 120px)' }}>
+          {/* Decorative background */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-50 to-blue-50 rounded-full translate-y-12 -translate-x-12 opacity-50"></div>
+
+          <div className="relative z-10 h-full">
+            <AppointmentCalendar
+              events={events}
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={handleSelectEvent}
+              onEventDrop={handleEventDrop}
+              onStatusChange={handleStatusChange}
+              onCompleteWithPayment={handleCompleteWithPayment}
+              loading={isLoading}
+            />
+          </div>
+        </div>
+      ) : (
+        <AppointmentHistory className="flex-1" />
+      )}
 
       {/* Modals */}
       <AppointmentModal
@@ -366,6 +427,18 @@ export const Appointments: React.FC = () => {
         event={selectedEvent}
         onStatusChange={handleStatusChange}
         canChangeStatus={true}
+      />
+
+      <PaymentMethodModal
+        isOpen={paymentModalOpen}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setAppointmentToComplete(null);
+        }}
+        onSelect={handlePaymentSelection}
+        title="Finalizar Agendamento"
+        amount={appointmentToComplete?.resource.total || 0}
+        loading={modalLoading}
       />
     </div>
   );

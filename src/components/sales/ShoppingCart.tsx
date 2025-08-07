@@ -1,7 +1,9 @@
-import React from 'react';
-import { ShoppingCart as CartIcon, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ShoppingCart as CartIcon, User, ChevronDown, X } from 'lucide-react';
 import { CartItem } from '../../types/sale';
 import { Client } from '../../types/client';
+import { PaymentMethod } from '../../types/payment';
+import { PaymentMethodModal } from '../ui/PaymentMethodModal';
 import { formatCurrency } from '../../utils/formatters';
 
 interface ShoppingCartProps {
@@ -11,7 +13,7 @@ interface ShoppingCartProps {
   onUpdateQuantity: (productId: number, quantity: number) => void;
   onRemoveItem: (productId: number) => void;
   onSelectClient: (client: Client | null) => void;
-  onFinalizeSale: () => void;
+  onFinalizeSale: (paymentMethod: PaymentMethod) => void;
   loading?: boolean;
 }
 
@@ -25,8 +27,68 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
   onFinalizeSale,
   loading = false
 }) => {
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+  
   const total = items.reduce((sum, item) => sum + item.subtotal, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Filter clients based on search
+  const filteredClients = clients.filter(client =>
+    client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    client.phone.includes(clientSearch)
+  );
+
+  // Sync search input with selected client
+  useEffect(() => {
+    setClientSearch(selectedClient ? selectedClient.name : '');
+  }, [selectedClient]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+        setShowClientDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle client selection
+  const handleClientSelect = (client: Client | null) => {
+    onSelectClient(client);
+    setClientSearch(client ? client.name : '');
+    setShowClientDropdown(false);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (value: string) => {
+    setClientSearch(value);
+    setShowClientDropdown(true);
+    if (!value) {
+      onSelectClient(null);
+    }
+  };
+
+  // Handle finalizing sale
+  const handleFinalizeSaleClick = () => {
+    if (items.length === 0) {
+      return;
+    }
+    setShowPaymentModal(true);
+  };
+
+  // Handle payment method selection
+  const handlePaymentMethodSelect = (paymentMethod: PaymentMethod) => {
+    onFinalizeSale(paymentMethod);
+    setShowPaymentModal(false);
+  };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 h-full flex flex-col">
@@ -50,26 +112,64 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Cliente (opcional)
         </label>
-        <div className="relative">
+        <div className="relative" ref={clientDropdownRef}>
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <User className="h-5 w-5 text-gray-400" />
           </div>
-          <select
-            value={selectedClient?.id || ''}
-            onChange={(e) => {
-              const clientId = parseInt(e.target.value);
-              const client = clients.find(c => c.id === clientId) || null;
-              onSelectClient(client);
-            }}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          >
-            <option value="">Venda avulsa</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
+          <input
+            type="text"
+            placeholder={selectedClient ? selectedClient.name : "Buscar cliente ou venda avulsa..."}
+            value={clientSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onFocus={() => setShowClientDropdown(true)}
+            className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+          />
+          <div className="absolute inset-y-0 right-0 flex items-center">
+            {selectedClient && (
+              <button
+                onClick={() => handleClientSelect(null)}
+                className="p-1 mr-1 text-gray-400 hover:text-gray-600"
+                title="Limpar seleção"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            <div className="pr-3 flex items-center pointer-events-none">
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            </div>
+          </div>
+
+          {/* Dropdown */}
+          {showClientDropdown && (
+            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {!clientSearch && (
+                <div
+                  onClick={() => handleClientSelect(null)}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer border-b border-gray-200"
+                >
+                  Venda avulsa
+                </div>
+              )}
+              {filteredClients.length > 0 ? (
+                filteredClients.map((client) => (
+                  <div
+                    key={client.id}
+                    onClick={() => handleClientSelect(client)}
+                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 ${
+                      selectedClient?.id === client.id ? 'bg-gray-50' : ''
+                    }`}
+                  >
+                    <div className="font-medium text-gray-900">{client.name}</div>
+                    <div className="text-xs text-gray-500">{client.phone}</div>
+                  </div>
+                ))
+              ) : clientSearch ? (
+                <div className="px-4 py-2 text-sm text-gray-500">
+                  Nenhum cliente encontrado
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -150,8 +250,8 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
           </div>
           
           <button
-            onClick={onFinalizeSale}
-            disabled={loading}
+            onClick={handleFinalizeSaleClick}
+            disabled={loading || items.length === 0}
             className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? (
@@ -165,6 +265,15 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
           </button>
         </div>
       )}
+
+      <PaymentMethodModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSelect={handlePaymentMethodSelect}
+        title="Finalizar Venda"
+        amount={total}
+        loading={loading}
+      />
     </div>
   );
 };

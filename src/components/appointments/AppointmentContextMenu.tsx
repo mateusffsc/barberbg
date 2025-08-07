@@ -9,6 +9,7 @@ interface AppointmentContextMenuProps {
   event: CalendarEvent | null;
   onClose: () => void;
   onStatusChange: (status: string) => void;
+  onCompleteWithPayment: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -20,6 +21,7 @@ export const AppointmentContextMenu: React.FC<AppointmentContextMenuProps> = ({
   event,
   onClose,
   onStatusChange,
+  onCompleteWithPayment,
   onEdit,
   onDelete
 }) => {
@@ -29,7 +31,7 @@ export const AppointmentContextMenu: React.FC<AppointmentContextMenuProps> = ({
     {
       label: 'Marcar como Concluído',
       icon: Check,
-      onClick: () => onStatusChange('completed'),
+      onClick: onCompleteWithPayment,
       show: event.resource.status === 'scheduled',
       className: 'text-green-600 hover:bg-green-50'
     },

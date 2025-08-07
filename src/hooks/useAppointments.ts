@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Appointment, AppointmentFormData, AppointmentsResponse, CalendarEvent } from '../types/appointment';
 import { Service } from '../types/service';
 import { Barber } from '../types/barber';
+import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
 import { fromLocalDateTimeString, toLocalISOString } from '../utils/dateHelpers';
 import toast from 'react-hot-toast';
@@ -213,11 +214,18 @@ export const useAppointments = () => {
     return dates;
   };
 
-  const updateAppointmentStatus = async (id: number, status: string): Promise<boolean> => {
+  const updateAppointmentStatus = async (id: number, status: string, paymentMethod?: PaymentMethod): Promise<boolean> => {
     try {
+      const updateData: any = { status };
+      
+      // Adicionar forma de pagamento se o status for completed e paymentMethod for fornecido
+      if (status === 'completed' && paymentMethod) {
+        updateData.payment_method = paymentMethod;
+      }
+
       const { error } = await supabase
         .from('appointments')
-        .update({ status })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;

@@ -13,6 +13,7 @@ import { Barbers } from './pages/Barbers';
 import { Appointments } from './pages/Appointments';
 import { Sales } from './pages/Sales';
 import { Reports } from './pages/Reports';
+import { MyReports } from './pages/MyReports';
 import { Expenses } from './pages/Expenses';
 
 function App() {
@@ -71,6 +72,12 @@ function App() {
             <Route path="meus-agendamentos" element={
               <ProtectedRoute allowedRoles={['barber']}>
                 <Appointments />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="minhas-comissoes" element={
+              <ProtectedRoute allowedRoles={['barber']}>
+                <MyReports />
               </ProtectedRoute>
             } />
 

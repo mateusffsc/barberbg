@@ -2,6 +2,7 @@ import React from 'react';
 import { ShoppingCart, User, UserCheck, Package, Calendar } from 'lucide-react';
 import { Sale } from '../../types/sale';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../types/payment';
 
 interface SalesTableProps {
   sales: Sale[];
@@ -65,6 +66,9 @@ export const SalesTable: React.FC<SalesTableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Total
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Forma de Pagamento
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -123,6 +127,12 @@ export const SalesTable: React.FC<SalesTableProps> = ({
                   <div className="text-sm font-bold text-green-600">
                     {formatCurrency(sale.total_amount)}
                   </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span className="mr-1">{getPaymentMethodIcon(sale.payment_method)}</span>
+                    {getPaymentMethodLabel(sale.payment_method)}
+                  </span>
                 </td>
               </tr>
             ))}

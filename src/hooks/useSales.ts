@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Sale, CartItem, SalesResponse } from '../types/sale';
 import { Product } from '../types/product';
 import { Barber } from '../types/barber';
+import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -100,7 +101,8 @@ export const useSales = () => {
   const createSale = async (
     cartItems: CartItem[],
     selectedClient: number | null,
-    selectedBarber: Barber
+    selectedBarber: Barber,
+    paymentMethod: PaymentMethod
   ): Promise<Sale | null> => {
     try {
       if (cartItems.length === 0) {
@@ -125,7 +127,8 @@ export const useSales = () => {
           client_id: selectedClient,
           barber_id: selectedBarber.id,
           sale_datetime: new Date().toISOString(),
-          total_amount: total
+          total_amount: total,
+          payment_method: paymentMethod
         })
         .select()
         .single();

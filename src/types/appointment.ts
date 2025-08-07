@@ -1,3 +1,5 @@
+import { PaymentMethod } from './payment';
+
 export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
 
 export interface Appointment {
@@ -8,6 +10,7 @@ export interface Appointment {
   status: AppointmentStatus;
   total_price: number;
   note?: string;
+  payment_method?: PaymentMethod;
   created_at: string;
   updated_at: string;
   client?: {

@@ -1,9 +1,12 @@
+import { PaymentMethod } from './payment';
+
 export interface Sale {
   id: number;
   client_id?: number;
   barber_id: number;
   sale_datetime: string;
   total_amount: number;
+  payment_method: PaymentMethod;
   created_at: string;
   updated_at: string;
   client?: {
