@@ -106,11 +106,13 @@ export const AppointmentHistory: React.FC<AppointmentHistoryProps> = ({ classNam
     }
   };
 
-  const filteredAppointments = appointments.filter(appointment =>
-    !searchTerm || 
-    appointment.client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    appointment.barber?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAppointments = appointments
+    .filter(appointment =>
+      !searchTerm || 
+      appointment.client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      appointment.barber?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => new Date(a.appointment_datetime).getTime() - new Date(b.appointment_datetime).getTime());
 
   const navigatePeriod = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
