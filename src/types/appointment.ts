@@ -5,19 +5,27 @@ export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_sh
 export interface Appointment {
   id: number;
   client_id: number;
+  client_name: string; // Nome do cliente (sincronizado automaticamente)
+  client_phone: string; // Telefone do cliente (sincronizado automaticamente)
   barber_id: number;
-  appointment_date: string; // Formato: YYYY-MM-DD
-  appointment_time: string; // Formato: HH:MM:SS
-  appointment_datetime?: string; // Campo calculado para compatibilidade
+  barber_name: string; // Nome do barbeiro (sincronizado automaticamente)
+  services_names: string; // Nomes dos serviços separados por vírgula
+  services_ids: number[]; // Array com IDs dos serviços
+  appointment_datetime: string; // Data e hora combinadas (principal)
+  appointment_date: string; // Data separada (YYYY-MM-DD)
+  appointment_time: string; // Hora separada (HH:MM:SS)
   status: AppointmentStatus;
   total_price: number;
-  note?: string;
+  duration_minutes?: number;
+  note?: string; // Observações do agendamento
   payment_method?: PaymentMethod;
   created_at: string;
   updated_at: string;
+  // Relacionamentos (opcionais para compatibilidade)
   client?: {
     id: number;
     name: string;
+    phone?: string;
   };
   barber?: {
     id: number;
@@ -35,11 +43,11 @@ export interface Appointment {
 export interface AppointmentFormData {
   client_id: number;
   barber_id: number;
-  appointment_date: string; // Formato: YYYY-MM-DD
-  appointment_time: string; // Formato: HH:MM
-  appointment_datetime?: string; // Para compatibilidade com código existente
+  appointment_datetime: string; // Principal - formato datetime-local
+  appointment_date?: string; // Opcional - formato YYYY-MM-DD
+  appointment_time?: string; // Opcional - formato HH:MM
   service_ids: number[];
-  note: string;
+  note: string; // Observações do agendamento
   recurrence?: {
     type: 'none' | 'daily' | 'weekly' | 'monthly';
     interval: number;

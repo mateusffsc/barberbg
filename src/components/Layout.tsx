@@ -16,6 +16,7 @@ import {
   Receipt
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { Logo } from './Logo';
 
 interface MenuItem {
   name: string;
@@ -75,7 +76,7 @@ export const Layout: React.FC = () => {
         }`}
       >
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-800">
-          <h1 className="text-xl font-bold">Sr Bigode</h1>
+          <Logo size="lg" textClassName="text-white" />
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-gray-400 hover:text-white"

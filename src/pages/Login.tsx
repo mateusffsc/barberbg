@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Scissors, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { Logo } from '../components/Logo';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -9,7 +10,7 @@ export const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { user, signIn } = useAuth();
 
   // Redirect if already logged in
@@ -40,14 +41,14 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-white rounded-full flex items-center justify-center">
-            <Scissors className="h-8 w-8 text-gray-900" />
+          <div className="mx-auto h-10 w-20 flex items-center justify-center">
+            <Logo size="x4" showText={false} />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-white">
-            Sr Bigode
+            Sr. Bigode
           </h2>
           <p className="mt-2 text-sm text-gray-400">
-            Faça login para acessar o sistema
+            Sistema de Gestão da Barbearia
           </p>
         </div>
 
@@ -126,7 +127,7 @@ export const Login: React.FC = () => {
             <h3 className="text-sm font-medium text-gray-900 mb-2">Usuários de teste:</h3>
             <div className="text-xs text-gray-600 space-y-1">
               <p><strong>Admin:</strong> admin / admin123</p>
-              <p><strong>Barbeiro:</strong> barber / barber123</p>
+              <p><strong>Barbeiro:</strong> roberto / roberto123</p>
             </div>
           </div>
         </div>
