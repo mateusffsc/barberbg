@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('AuthContext: Erro ao verificar auth', error);
-      localStorage.removeItem('barbershop_user');
+      localStorage.removeItem('_user');
     } finally {
       console.log('AuthContext: Finalizando loading');
       setLoading(false);

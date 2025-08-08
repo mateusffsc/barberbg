@@ -44,7 +44,7 @@ export const Login: React.FC = () => {
             <Scissors className="h-8 w-8 text-gray-900" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-white">
-            BarberShop System
+            Sr Bigode
           </h2>
           <p className="mt-2 text-sm text-gray-400">
             Faça login para acessar o sistema

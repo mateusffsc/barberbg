@@ -6,7 +6,9 @@ export interface Appointment {
   id: number;
   client_id: number;
   barber_id: number;
-  appointment_datetime: string;
+  appointment_date: string; // Formato: YYYY-MM-DD
+  appointment_time: string; // Formato: HH:MM:SS
+  appointment_datetime?: string; // Campo calculado para compatibilidade
   status: AppointmentStatus;
   total_price: number;
   note?: string;
@@ -33,7 +35,9 @@ export interface Appointment {
 export interface AppointmentFormData {
   client_id: number;
   barber_id: number;
-  appointment_datetime: string;
+  appointment_date: string; // Formato: YYYY-MM-DD
+  appointment_time: string; // Formato: HH:MM
+  appointment_datetime?: string; // Para compatibilidade com código existente
   service_ids: number[];
   note: string;
   recurrence?: {
