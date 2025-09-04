@@ -26,7 +26,8 @@ export const BarberModal: React.FC<BarberModalProps> = ({
     email: '',
     commission_rate_service: 30,
     commission_rate_product: 10,
-    commission_rate_chemical_service: 40
+    commission_rate_chemical_service: 40,
+    is_special_barber: false
   });
   const [errors, setErrors] = useState<Partial<BarberFormData>>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -43,7 +44,8 @@ export const BarberModal: React.FC<BarberModalProps> = ({
         email: barber.email || '',
         commission_rate_service: Math.round(barber.commission_rate_service * 100),
         commission_rate_product: Math.round(barber.commission_rate_product * 100),
-        commission_rate_chemical_service: Math.round(barber.commission_rate_chemical_service * 100)
+        commission_rate_chemical_service: Math.round(barber.commission_rate_chemical_service * 100),
+        is_special_barber: barber.is_special_barber || false
       });
     } else {
       setFormData({
@@ -54,7 +56,8 @@ export const BarberModal: React.FC<BarberModalProps> = ({
         email: '',
         commission_rate_service: 30,
         commission_rate_product: 10,
-        commission_rate_chemical_service: 40
+        commission_rate_chemical_service: 40,
+        is_special_barber: false
       });
     }
     setErrors({});
@@ -111,7 +114,8 @@ export const BarberModal: React.FC<BarberModalProps> = ({
           email: formData.email,
           commission_rate_service: formData.commission_rate_service,
           commission_rate_product: formData.commission_rate_product,
-          commission_rate_chemical_service: formData.commission_rate_chemical_service
+          commission_rate_chemical_service: formData.commission_rate_chemical_service,
+          is_special_barber: formData.is_special_barber
         };
         await onSubmit(updateData);
       } else {
@@ -414,6 +418,28 @@ export const BarberModal: React.FC<BarberModalProps> = ({
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Checkbox Barbeiro Especial */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Configurações Especiais</h4>
+                <div className="flex items-center space-x-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <input
+                    type="checkbox"
+                    id="is_special_barber"
+                    checked={formData.is_special_barber}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_special_barber: e.target.checked }))}
+                    className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                    disabled={loading}
+                  />
+                  <label htmlFor="is_special_barber" className="flex items-center space-x-2 text-sm font-medium text-gray-700">
+                    <span className="text-yellow-600">⭐</span>
+                    <span>Barbeiro Especial</span>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Barbeiros especiais usam os tempos especiais configurados nos serviços
+                </p>
               </div>
             </form>
           </div>

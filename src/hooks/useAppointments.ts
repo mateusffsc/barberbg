@@ -86,7 +86,16 @@ export const useAppointments = () => {
     try {
       // Calcular total e duração
       const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
-      const totalDuration = selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
+      // Calcular duração total usando a nova função SQL
+      let totalDuration = 0;
+      for (const serviceId of appointmentData.service_ids) {
+        const { data: duration } = await supabase
+          .rpc('get_service_duration', {
+            p_service_id: serviceId,
+            p_barber_id: appointmentData.barber_id
+          });
+        totalDuration += duration || 0;
+      }
       
       // Gerar datas dos agendamentos baseado na recorrência
       // Usar função que não converte timezone
@@ -98,6 +107,15 @@ export const useAppointments = () => {
       console.log('Data original do form:', appointmentData.appointment_datetime);
       console.log('Data convertida:', appointmentDates[0]);
       console.log('Data que será salva:', toLocalISOString(appointmentDates[0]));
+
+      // Buscar dados do cliente
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('name, phone')
+        .eq('id', appointmentData.client_id)
+        .single();
+
+      if (clientError) throw clientError;
 
       // Verificar conflitos para todas as datas
       for (const date of appointmentDates) {
@@ -128,7 +146,14 @@ export const useAppointments = () => {
           .insert({
             client_id: appointmentData.client_id,
             barber_id: appointmentData.barber_id,
+            client_name: clientData.name,
+            client_phone: clientData.phone,
+            barber_name: selectedBarber.name,
+            services_names: selectedServices.map(s => s.name).join(', '),
+            services_ids: selectedServices.map(s => s.id),
             appointment_datetime: toLocalISOString(date),
+            appointment_date: date.toISOString().split('T')[0], // YYYY-MM-DD
+            appointment_time: date.toTimeString().split(' ')[0], // HH:MM:SS
             status: 'scheduled',
             total_price: totalPrice,
             note: appointmentData.note.trim() || null

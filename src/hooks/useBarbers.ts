@@ -95,7 +95,8 @@ export const useBarbers = () => {
           email: barberData.email.trim() || null,
           commission_rate_service: barberData.commission_rate_service / 100,
           commission_rate_product: barberData.commission_rate_product / 100,
-          commission_rate_chemical_service: barberData.commission_rate_chemical_service / 100
+          commission_rate_chemical_service: barberData.commission_rate_chemical_service / 100,
+          is_special_barber: barberData.is_special_barber || false
         })
         .select(`
           *,
@@ -156,7 +157,8 @@ export const useBarbers = () => {
           email: barberData.email.trim() || null,
           commission_rate_service: barberData.commission_rate_service / 100,
           commission_rate_product: barberData.commission_rate_product / 100,
-          commission_rate_chemical_service: barberData.commission_rate_chemical_service / 100
+          commission_rate_chemical_service: barberData.commission_rate_chemical_service / 100,
+          is_special_barber: barberData.is_special_barber || false
         })
         .eq('id', id)
         .select(`

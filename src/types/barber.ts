@@ -7,6 +7,7 @@ export interface Barber {
   commission_rate_service: number;
   commission_rate_product: number;
   commission_rate_chemical_service: number;
+  is_special_barber: boolean;
   created_at: string;
   updated_at: string;
   user?: {
@@ -25,6 +26,7 @@ export interface BarberFormData {
   commission_rate_service: number;
   commission_rate_product: number;
   commission_rate_chemical_service: number;
+  is_special_barber: boolean;
 }
 
 export interface BarberUpdateData {
@@ -34,6 +36,7 @@ export interface BarberUpdateData {
   commission_rate_service: number;
   commission_rate_product: number;
   commission_rate_chemical_service: number;
+  is_special_barber: boolean;
 }
 
 export interface BarbersResponse {

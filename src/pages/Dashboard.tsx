@@ -289,8 +289,7 @@ export const Dashboard: React.FC = () => {
       
       setAllTodayAppointments(todayAppointmentsWithServices);
       
-      // Buscar próximos agendamentos (a partir de agora, nos próximos 7 dias)
-      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      // Buscar agendamentos do dia atual (a partir de agora até o final do dia)
       let upcomingQuery = supabase
         .from('appointments')
         .select(`
@@ -303,7 +302,7 @@ export const Dashboard: React.FC = () => {
         `)
         .eq('status', 'scheduled')
         .gte('appointment_datetime', now.toISOString())
-        .lte('appointment_datetime', nextWeek.toISOString())
+        .lte('appointment_datetime', endOfToday.toISOString())
         .order('appointment_datetime', { ascending: true })
         .limit(5);
 
@@ -319,7 +318,7 @@ export const Dashboard: React.FC = () => {
         services: apt.appointment_services?.map((as: any) => as.service) || []
       }));
       
-      console.log('Próximos agendamentos encontrados:', upcomingAppointmentsWithServices.length);
+      console.log('Agendamentos do dia encontrados:', upcomingAppointmentsWithServices.length);
       setTodayAppointments(upcomingAppointmentsWithServices.slice(0, 3));
 
       // 2. Buscar total de clientes (sempre total, independente do filtro)
@@ -770,7 +769,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-            Próximos Agendamentos (7 dias)
+            Agendamentos de Hoje
           </h2>
           <div className="space-y-3 sm:space-y-4">
             {todayAppointments.length > 0 ? (
@@ -796,8 +795,8 @@ export const Dashboard: React.FC = () => {
               ))
             ) : (
               <div className="text-center py-6 sm:py-4 text-gray-500">
-                <p className="text-sm">Nenhum agendamento próximo</p>
-                <p className="text-xs">Os próximos agendamentos aparecerão aqui</p>
+                <p className="text-sm">Nenhum agendamento para hoje</p>
+                <p className="text-xs">Os agendamentos de hoje aparecerão aqui</p>
               </div>
             )}
           </div>

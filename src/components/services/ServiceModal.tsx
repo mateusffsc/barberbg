@@ -22,7 +22,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     name: '',
     description: '',
     price: '',
-    duration_minutes: '30',
+    duration_minutes_normal: 30,
+    duration_minutes_special: 40,
     is_chemical: false
   });
   const [errors, setErrors] = useState<Partial<ServiceFormData>>({});
@@ -32,8 +33,9 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       setFormData({
         name: service.name,
         description: service.description || '',
-        price: formatCurrencyInput((service.price * 100).toString()),
-        duration_minutes: service.duration_minutes.toString(),
+        price: formatCurrencyInput((service.price * 100).toString()), // Converter para formato de entrada
+        duration_minutes_normal: service.duration_minutes_normal || service.duration_minutes || 30,
+        duration_minutes_special: service.duration_minutes_special || 40,
         is_chemical: service.is_chemical
       });
     } else {
@@ -41,7 +43,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         name: '',
         description: '',
         price: '',
-        duration_minutes: '30',
+        duration_minutes_normal: 30,
+        duration_minutes_special: 40,
         is_chemical: false
       });
     }
@@ -55,14 +58,17 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       newErrors.name = 'Nome é obrigatório';
     }
 
-    const price = parseCurrency(formData.price);
+    const price = typeof formData.price === 'string' ? parseCurrency(formData.price) : formData.price;
     if (!formData.price || price <= 0) {
       newErrors.price = 'Preço deve ser maior que zero';
     }
 
-    const duration = parseInt(formData.duration_minutes);
-    if (!formData.duration_minutes || duration < 15) {
-      newErrors.duration_minutes = 'Duração mínima é de 15 minutos';
+    if (!formData.duration_minutes_normal || formData.duration_minutes_normal < 15) {
+      newErrors.duration_minutes_normal = 'Duração mínima é de 15 minutos';
+    }
+
+    if (!formData.duration_minutes_special || formData.duration_minutes_special < 15) {
+      newErrors.duration_minutes_special = 'Duração mínima é de 15 minutos';
     }
 
     setErrors(newErrors);
@@ -177,8 +183,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-1">
-                    Duração (min) *
+                  <label htmlFor="duration_normal" className="block text-sm font-medium text-gray-700 mb-1">
+                    Tempo Normal (min) *
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -186,22 +192,52 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     </div>
                     <input
                       type="number"
-                      id="duration"
+                      id="duration_normal"
                       min="15"
                       step="5"
-                      value={formData.duration_minutes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value }))}
+                      value={formData.duration_minutes_normal}
+                      onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes_normal: parseInt(e.target.value) || 0 }))}
                       className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
-                        errors.duration_minutes ? 'border-red-300' : 'border-gray-300'
+                        errors.duration_minutes_normal ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder="30"
                       disabled={loading}
                     />
                   </div>
-                  {errors.duration_minutes && (
-                    <p className="mt-1 text-sm text-red-600">{errors.duration_minutes}</p>
+                  {errors.duration_minutes_normal && (
+                    <p className="mt-1 text-sm text-red-600">{errors.duration_minutes_normal}</p>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="duration_special" className="block text-sm font-medium text-gray-700 mb-1">
+                  Tempo Especial (min) *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Clock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="number"
+                    id="duration_special"
+                    min="15"
+                    step="5"
+                    value={formData.duration_minutes_special}
+                    onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes_special: parseInt(e.target.value) || 0 }))}
+                    className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                      errors.duration_minutes_special ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="40"
+                    disabled={loading}
+                  />
+                </div>
+                {errors.duration_minutes_special && (
+                  <p className="mt-1 text-sm text-red-600">{errors.duration_minutes_special}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Tempo usado por barbeiros especiais
+                </p>
               </div>
 
               <div className="flex items-center">

@@ -124,10 +124,9 @@ export const Login: React.FC = () => {
           </form>
 
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Usuários de teste:</h3>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Use o nome cadastrado no login inicial</h3>
             <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Admin:</strong> admin / admin123</p>
-              <p><strong>Barbeiro:</strong> roberto / roberto123</p>
+              
             </div>
           </div>
         </div>

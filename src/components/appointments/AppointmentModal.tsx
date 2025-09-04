@@ -48,6 +48,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   });
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [calculatedDuration, setCalculatedDuration] = useState<number>(0);
   const [errors, setErrors] = useState<Partial<AppointmentFormData>>({});
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -67,6 +68,93 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   }, [selectedDate]);
 
+  // Recalcular duração quando barbeiro ou serviços mudarem
+  useEffect(() => {
+    const updateDuration = async () => {
+      console.log('useEffect updateDuration chamado:', { 
+        barber_id: formData.barber_id, 
+        selectedServices: selectedServices.length,
+        services: selectedServices.map(s => ({ 
+          id: s.id, 
+          name: s.name, 
+          duration: s.duration_minutes,
+          duration_normal: s.duration_minutes_normal,
+          duration_special: s.duration_minutes_special
+        }))
+      });
+      
+      // Teste para verificar se os campos existem
+       if (selectedServices.length > 0) {
+         console.log('Primeiro serviço completo:', selectedServices[0]);
+         
+         // Teste da função SQL
+         try {
+           const testResult = await supabase.rpc('get_service_duration', {
+             p_service_id: selectedServices[0].id,
+             p_barber_id: formData.barber_id
+           });
+           console.log('Teste da função SQL:', testResult);
+         } catch (testError) {
+           console.error('Erro no teste da função SQL:', testError);
+         }
+       }
+      
+      if (!formData.barber_id || selectedServices.length === 0) {
+        const fallbackDuration = selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
+        console.log('useEffect - Usando fallback duration:', fallbackDuration);
+        setCalculatedDuration(fallbackDuration);
+        return;
+      }
+
+      let totalDuration = 0;
+      
+      // Verificar se o barbeiro selecionado é especial
+      const selectedBarber = barbers.find(b => b.id === formData.barber_id);
+      const isSpecialBarber = selectedBarber?.is_special_barber || false;
+      
+      console.log('Barbeiro selecionado:', { id: formData.barber_id, name: selectedBarber?.name, isSpecial: isSpecialBarber });
+      
+      for (const service of selectedServices) {
+        let serviceDuration = service.duration_minutes; // Fallback padrão
+        
+        // Tentar usar os novos campos se existirem
+        if (service.duration_minutes_normal && service.duration_minutes_special) {
+          serviceDuration = isSpecialBarber ? service.duration_minutes_special : service.duration_minutes_normal;
+          console.log(`Serviço ${service.name}: usando duração ${isSpecialBarber ? 'especial' : 'normal'} = ${serviceDuration} minutos`);
+        } else {
+          // Tentar a função SQL como fallback
+          try {
+            console.log('useEffect - Chamando get_service_duration para:', { service_id: service.id, barber_id: formData.barber_id });
+            const { data: duration, error } = await supabase
+              .rpc('get_service_duration', {
+                p_service_id: service.id,
+                p_barber_id: formData.barber_id
+              });
+            
+            if (error) {
+              console.error('useEffect - Erro na função SQL:', error);
+            } else if (duration) {
+              serviceDuration = duration;
+              console.log('useEffect - Duração retornada pela SQL:', duration, 'para serviço:', service.name);
+            }
+          } catch (error) {
+            console.error('useEffect - Erro ao calcular duração:', error);
+          }
+        }
+        
+        totalDuration += serviceDuration;
+      }
+      console.log('useEffect - Duração total calculada:', totalDuration);
+      setCalculatedDuration(totalDuration);
+    };
+    
+    if (formData.barber_id && selectedServices.length > 0) {
+      updateDuration();
+    } else {
+      setCalculatedDuration(0);
+    }
+  }, [formData.barber_id, selectedServices]);
+
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -83,6 +171,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }
       });
       setSelectedServices([]);
+      setCalculatedDuration(0);
       setClientSearch('');
       setShowNewClientForm(false);
       setNewClientData({ name: '', phone: '', email: '' });
@@ -102,8 +191,39 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     return selectedServices.reduce((sum, service) => sum + service.price, 0);
   };
 
-  const calculateDuration = () => {
-    return selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
+  const calculateDuration = async () => {
+    console.log('calculateDuration chamada:', { barber_id: formData.barber_id, selectedServices: selectedServices.length });
+    
+    if (!formData.barber_id || selectedServices.length === 0) {
+      const fallbackDuration = selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
+      console.log('Usando fallback duration:', fallbackDuration);
+      return fallbackDuration;
+    }
+
+    let totalDuration = 0;
+    for (const service of selectedServices) {
+      try {
+        console.log('Chamando get_service_duration para:', { service_id: service.id, barber_id: formData.barber_id });
+        const { data: duration, error } = await supabase
+          .rpc('get_service_duration', {
+            p_service_id: service.id,
+            p_barber_id: formData.barber_id
+          });
+        
+        if (error) {
+          console.error('Erro na função SQL:', error);
+          totalDuration += service.duration_minutes;
+        } else {
+          console.log('Duração retornada pela SQL:', duration, 'para serviço:', service.name);
+          totalDuration += duration || service.duration_minutes;
+        }
+      } catch (error) {
+        console.error('Erro ao calcular duração:', error);
+        totalDuration += service.duration_minutes;
+      }
+    }
+    console.log('Duração total calculada:', totalDuration);
+    return totalDuration;
   };
 
   const handleServiceToggle = (service: Service) => {
@@ -389,7 +509,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <div className="space-y-1 text-sm text-gray-600">
                     <div className="flex justify-between">
                       <span>Duração total:</span>
-                      <span>{calculateDuration()} minutos</span>
+                <span>{calculatedDuration} minutos</span>
                     </div>
                     <div className="flex justify-between font-medium text-gray-900">
                       <span>Total:</span>

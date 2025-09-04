@@ -46,25 +46,31 @@ export const useServices = () => {
   const createService = async (serviceData: ServiceFormData): Promise<Service | null> => {
     try {
       const price = parseCurrency(serviceData.price);
-      const duration = parseInt(serviceData.duration_minutes);
 
       if (price < 0) {
         toast.error('O preço não pode ser negativo');
         return null;
       }
 
-      if (duration < 15) {
-        toast.error('A duração mínima é de 15 minutos');
+      if (serviceData.duration_minutes_normal < 15) {
+        toast.error('A duração normal mínima é de 15 minutos');
         return null;
       }
 
-      const { data, error } = await supabase
+      if (serviceData.duration_minutes_special < 15) {
+        toast.error('A duração especial mínima é de 15 minutos');
+        return null;
+      }
+
+      const { data: service, error } = await supabase
         .from('services')
         .insert({
           name: serviceData.name.trim(),
           description: serviceData.description.trim() || null,
-          price,
-          duration_minutes: duration,
+          price: price,
+          duration_minutes: serviceData.duration_minutes_normal, // Para compatibilidade
+          duration_minutes_normal: serviceData.duration_minutes_normal,
+          duration_minutes_special: serviceData.duration_minutes_special,
           is_chemical: serviceData.is_chemical
         })
         .select()
@@ -73,7 +79,7 @@ export const useServices = () => {
       if (error) throw error;
 
       toast.success('Serviço cadastrado com sucesso!');
-      return data;
+      return service;
     } catch (error: any) {
       console.error('Erro ao criar serviço:', error);
       
@@ -90,15 +96,19 @@ export const useServices = () => {
   const updateService = async (id: number, serviceData: ServiceFormData): Promise<Service | null> => {
     try {
       const price = parseCurrency(serviceData.price);
-      const duration = parseInt(serviceData.duration_minutes);
 
       if (price < 0) {
         toast.error('O preço não pode ser negativo');
         return null;
       }
 
-      if (duration < 15) {
-        toast.error('A duração mínima é de 15 minutos');
+      if (serviceData.duration_minutes_normal < 15) {
+        toast.error('A duração normal mínima é de 15 minutos');
+        return null;
+      }
+
+      if (serviceData.duration_minutes_special < 15) {
+        toast.error('A duração especial mínima é de 15 minutos');
         return null;
       }
 
@@ -108,7 +118,9 @@ export const useServices = () => {
           name: serviceData.name.trim(),
           description: serviceData.description.trim() || null,
           price,
-          duration_minutes: duration,
+          duration_minutes: serviceData.duration_minutes_normal, // Para compatibilidade
+          duration_minutes_normal: serviceData.duration_minutes_normal,
+          duration_minutes_special: serviceData.duration_minutes_special,
           is_chemical: serviceData.is_chemical
         })
         .eq('id', id)
