@@ -15,6 +15,7 @@ import { Sales } from './pages/Sales';
 import { Reports } from './pages/Reports';
 import { MyReports } from './pages/MyReports';
 import { Expenses } from './pages/Expenses';
+import { ClientRegistration } from './pages/ClientRegistration';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/cadastrodeclientes" element={<ClientRegistration />} />
           
           <Route path="/" element={
             <ProtectedRoute>
