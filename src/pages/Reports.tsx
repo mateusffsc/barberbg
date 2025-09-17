@@ -21,12 +21,16 @@ import { TopItemsList } from '../components/reports/TopItemsList';
 import { PeriodSelector } from '../components/reports/PeriodSelector';
 import { DashboardData, ReportPeriod } from '../types/report';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdminAuth } from '../hooks/useAdminAuth';
+import { AdminPasswordModal } from '../components/ui/AdminPasswordModal';
 import toast, { Toaster } from 'react-hot-toast';
 
 export const Reports: React.FC = () => {
   const { user } = useAuth();
   const { loading, generateDashboard } = useReports();
+  const { isAuthenticated, isLoading: authLoading, authenticate } = useAdminAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>({
     startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
     endDate: new Date(),
@@ -34,8 +38,16 @@ export const Reports: React.FC = () => {
   });
 
   useEffect(() => {
-    loadDashboard();
-  }, [selectedPeriod]);
+    if (!authLoading && !isAuthenticated) {
+      setShowPasswordModal(true);
+    }
+  }, [authLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDashboard();
+    }
+  }, [selectedPeriod, isAuthenticated]);
 
   const loadDashboard = async () => {
     try {
@@ -47,12 +59,28 @@ export const Reports: React.FC = () => {
     }
   };
 
-  if (loading && !dashboardData) {
+  if (authLoading || (loading && !dashboardData)) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6">
+        <AdminPasswordModal
+          isOpen={showPasswordModal}
+          onClose={() => setShowPasswordModal(false)}
+          onSuccess={() => {
+            authenticate();
+            setShowPasswordModal(false);
+          }}
+          title="Acesso aos Relatórios Administrativos"
+        />
       </div>
     );
   }
@@ -413,6 +441,16 @@ export const Reports: React.FC = () => {
           )}
         </>
       )}
+
+      <AdminPasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={() => {
+          authenticate();
+          setShowPasswordModal(false);
+        }}
+        title="Acesso aos Relatórios Administrativos"
+      />
     </div>
   );
 };
