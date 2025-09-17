@@ -37,6 +37,7 @@ interface RecentAppointment {
   appointment_datetime: string;
   status: string;
   total_price: number;
+  final_amount?: number;
   client: {
     name: string;
   };
@@ -144,6 +145,7 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
           appointment_datetime,
           status,
           total_price,
+          final_amount,
           client:clients(name),
           appointment_services(
             service_id,
@@ -175,7 +177,7 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
       let totalRevenue = 0;
 
       const formattedAppointments = appointmentsData.map(apt => {
-        totalRevenue += apt.total_price;
+        totalRevenue += (apt.final_amount || apt.total_price);
         
         const services = apt.appointment_services?.map((as: any) => {
           const service = {
@@ -184,12 +186,17 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
             price: as.price_at_booking
           };
 
+          // Calcular comissão proporcional ao final_amount
+          const originalTotal = apt.total_price;
+          const finalTotal = apt.final_amount || apt.total_price;
+          const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+
           if (as.service.is_chemical) {
             totalChemicalServices++;
-            chemicalCommission += as.price_at_booking * as.commission_rate_applied;
+            chemicalCommission += as.price_at_booking * as.commission_rate_applied * discountFactor;
           } else {
             totalServices++;
-            serviceCommission += as.price_at_booking * as.commission_rate_applied;
+            serviceCommission += as.price_at_booking * as.commission_rate_applied * discountFactor;
           }
 
           return service;
@@ -269,7 +276,7 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
           type: 'appointment',
           client_name: apt.client.name,
           items: apt.services.map(s => s.name),
-          total_value: apt.total_price,
+          total_value: (apt.final_amount || apt.total_price),
           commission_value: serviceCommissions
         });
       });

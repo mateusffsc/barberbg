@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { CalendarEvent } from '../../types/appointment';
 import { PaymentMethod } from '../../types/payment';
-import { PaymentMethodModal } from '../ui/PaymentMethodModal';
+import { PaymentConfirmationModal } from '../ui/PaymentConfirmationModal';
 import { formatCurrency } from '../../utils/formatters';
 import toast from 'react-hot-toast';
 
@@ -10,7 +10,7 @@ interface AppointmentDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: CalendarEvent | null;
-  onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod) => Promise<void>;
+  onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => Promise<void>;
   canChangeStatus?: boolean;
 }
 
@@ -53,12 +53,12 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     });
   };
 
-  const handleStatusChange = async (newStatus: string, paymentMethod?: PaymentMethod) => {
+  const handleStatusChange = async (newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => {
     if (!onStatusChange || !event) return;
     
     setUpdating(true);
     try {
-      await onStatusChange(event.resource.appointment.id, newStatus, paymentMethod);
+      await onStatusChange(event.resource.appointment.id, newStatus, paymentMethod, finalAmount);
       toast.success(`Status alterado para ${getStatusText(newStatus)}`);
       onClose();
     } catch (error) {
@@ -73,9 +73,9 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     setShowPaymentModal(true);
   };
 
-  const handlePaymentMethodSelect = (paymentMethod: PaymentMethod) => {
+  const handlePaymentMethodSelect = (paymentMethod: PaymentMethod, finalAmount: number) => {
     setShowPaymentModal(false);
-    handleStatusChange('completed', paymentMethod);
+    handleStatusChange('completed', paymentMethod, finalAmount);
   };
 
   const canShowStatusButtons = canChangeStatus && event?.resource.status === 'scheduled';
@@ -253,12 +253,12 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         </div>
       </div>
 
-      <PaymentMethodModal
+      <PaymentConfirmationModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        onSelect={handlePaymentMethodSelect}
+        onConfirm={handlePaymentMethodSelect}
         title="Finalizar Agendamento"
-        amount={event.resource.total}
+        originalAmount={event.resource.total}
         loading={updating}
       />
     </div>

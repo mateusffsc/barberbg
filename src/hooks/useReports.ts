@@ -144,7 +144,7 @@ export const useReports = () => {
       const noShowAppointments = appointments?.filter(apt => apt.status === 'no_show').length || 0;
       
       const completedApts = appointments?.filter(apt => apt.status === 'completed') || [];
-      const totalRevenue = completedApts.reduce((sum, apt) => sum + apt.total_price, 0);
+      const totalRevenue = completedApts.reduce((sum, apt) => sum + (apt.final_amount || apt.total_price), 0);
       const averageTicket = completedApts.length > 0 ? totalRevenue / completedApts.length : 0;
 
       // Top serviços
@@ -175,7 +175,7 @@ export const useReports = () => {
         const existing = appointmentsByDay.get(date) || { date, appointments: 0, revenue: 0 };
         existing.appointments += 1;
         if (apt.status === 'completed') {
-          existing.revenue += apt.total_price;
+          existing.revenue += (apt.final_amount || apt.total_price);
         }
         appointmentsByDay.set(date, existing);
       });
@@ -194,11 +194,16 @@ export const useReports = () => {
         existing.appointments += 1;
         
         if (apt.status === 'completed') {
-          existing.revenue += apt.total_price;
+          existing.revenue += (apt.final_amount || apt.total_price);
           
-          // Calcular comissão dos serviços
+          // Calcular comissão dos serviços proporcionalmente ao final_amount
+          const originalTotal = apt.total_price;
+          const finalTotal = apt.final_amount || apt.total_price;
+          const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+
           apt.appointment_services?.forEach((as: any) => {
-            existing.commission += as.price_at_booking * as.commission_rate_applied;
+            const adjustedCommission = as.price_at_booking * as.commission_rate_applied * discountFactor;
+            existing.commission += adjustedCommission;
           });
         }
         
@@ -243,6 +248,7 @@ export const useReports = () => {
         .select(`
           client_id,
           total_price,
+          final_amount,
           appointment_datetime,
           status,
           client:clients(id, name)
@@ -269,7 +275,7 @@ export const useReports = () => {
           totalAppointments: 0,
           lastVisit: apt.appointment_datetime
         };
-        existing.totalSpent += apt.total_price;
+        existing.totalSpent += (apt.final_amount || apt.total_price);
         existing.totalAppointments += 1;
         if (new Date(apt.appointment_datetime) > new Date(existing.lastVisit)) {
           existing.lastVisit = apt.appointment_datetime;

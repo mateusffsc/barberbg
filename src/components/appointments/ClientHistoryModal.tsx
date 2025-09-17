@@ -22,6 +22,7 @@ interface AppointmentHistory {
   appointment_datetime: string;
   status: string;
   total_price: number;
+  final_amount?: number;
   barber: {
     name: string;
   };
@@ -78,6 +79,7 @@ export const ClientHistoryModal: React.FC<ClientHistoryModalProps> = ({
           appointment_datetime,
           status,
           total_price,
+          final_amount,
           barber:barbers(name),
           appointment_services(
             service:services(name, price)
@@ -105,7 +107,7 @@ export const ClientHistoryModal: React.FC<ClientHistoryModalProps> = ({
       const cancelledAppointments = appointmentsData.filter(apt => apt.status === 'cancelled').length;
       const totalSpent = appointmentsData
         .filter(apt => apt.status === 'completed')
-        .reduce((sum, apt) => sum + apt.total_price, 0);
+        .reduce((sum, apt) => sum + (apt.final_amount || apt.total_price), 0);
       const averageTicket = completedAppointments > 0 ? totalSpent / completedAppointments : 0;
 
       setStats({
@@ -262,7 +264,7 @@ export const ClientHistoryModal: React.FC<ClientHistoryModalProps> = ({
                             <div className="flex items-center space-x-1">
                               <DollarSign className="h-4 w-4 text-green-600" />
                               <span className="font-medium text-green-600">
-                                {formatCurrency(appointment.total_price)}
+                                {formatCurrency(appointment.final_amount || appointment.total_price)}
                               </span>
                             </div>
                           </div>

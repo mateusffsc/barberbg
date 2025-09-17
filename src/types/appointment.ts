@@ -16,6 +16,7 @@ export interface Appointment {
   appointment_time: string; // Hora separada (HH:MM:SS)
   status: AppointmentStatus;
   total_price: number;
+  final_amount?: number; // Valor final após desconto/acréscimo
   duration_minutes?: number;
   note?: string; // Observações do agendamento
   payment_method?: PaymentMethod;

@@ -171,9 +171,9 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod) => {
+  const handleStatusChange = async (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => {
     try {
-      const success = await updateAppointmentStatus(appointmentId, newStatus, paymentMethod);
+      const success = await updateAppointmentStatus(appointmentId, newStatus, paymentMethod, finalAmount);
       if (success) {
         await loadAppointments();
         // Atualizar o evento selecionado se for o mesmo

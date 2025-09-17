@@ -239,13 +239,18 @@ export const useAppointments = () => {
     return dates;
   };
 
-  const updateAppointmentStatus = async (id: number, status: string, paymentMethod?: PaymentMethod): Promise<boolean> => {
+  const updateAppointmentStatus = async (id: number, status: string, paymentMethod?: PaymentMethod, finalAmount?: number): Promise<boolean> => {
     try {
       const updateData: any = { status };
       
       // Adicionar forma de pagamento se o status for completed e paymentMethod for fornecido
       if (status === 'completed' && paymentMethod) {
         updateData.payment_method = paymentMethod;
+        
+        // Adicionar valor final se fornecido e diferente do valor original
+        if (finalAmount !== undefined) {
+          updateData.final_amount = finalAmount;
+        }
       }
 
       const { error } = await supabase

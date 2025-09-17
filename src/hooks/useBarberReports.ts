@@ -130,16 +130,21 @@ export const useBarberReports = () => {
 
     // Calcular comissões de serviços
     appointments?.forEach(appointment => {
+      const originalTotal = appointment.total_price;
+      const finalTotal = appointment.final_amount || appointment.total_price;
+      const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+
       appointment.appointment_services?.forEach((service: any) => {
         const revenue = service.price_at_booking;
+        const adjustedRevenue = revenue * discountFactor;
         const commissionRate = service.commission_rate_applied;
-        const commission = revenue * commissionRate;
+        const commission = adjustedRevenue * commissionRate;
 
         if (service.service.is_chemical) {
-          totalChemicalServiceRevenue += revenue;
+          totalChemicalServiceRevenue += adjustedRevenue;
           chemicalServiceCommission += commission;
         } else {
-          totalServiceRevenue += revenue;
+          totalServiceRevenue += adjustedRevenue;
           serviceCommission += commission;
         }
       });
@@ -202,10 +207,15 @@ export const useBarberReports = () => {
     const serviceStats = new Map();
 
     appointments?.forEach(appointment => {
+      const originalTotal = appointment.total_price;
+      const finalTotal = appointment.final_amount || appointment.total_price;
+      const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+
       appointment.appointment_services?.forEach((service: any) => {
         const key = service.service_id;
         const revenue = service.price_at_booking;
-        const commission = revenue * service.commission_rate_applied;
+        const adjustedRevenue = revenue * discountFactor;
+        const commission = adjustedRevenue * service.commission_rate_applied;
 
         if (!serviceStats.has(key)) {
           serviceStats.set(key, {
@@ -222,7 +232,7 @@ export const useBarberReports = () => {
 
         const stats = serviceStats.get(key);
         stats.count += 1;
-        stats.totalRevenue += revenue;
+        stats.totalRevenue += adjustedRevenue;
         stats.totalCommission += commission;
         stats.averagePrice = stats.totalRevenue / stats.count;
       });
@@ -340,11 +350,16 @@ export const useBarberReports = () => {
       const dateStr = appointment.appointment_datetime.split('T')[0];
       const stats = dailyStats.get(dateStr);
       if (stats) {
+        const originalTotal = appointment.total_price;
+        const finalTotal = appointment.final_amount || appointment.total_price;
+        const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+
         stats.appointmentsCount += 1;
         appointment.appointment_services?.forEach((service: any) => {
-          const commission = service.price_at_booking * service.commission_rate_applied;
+          const adjustedRevenue = service.price_at_booking * discountFactor;
+          const commission = adjustedRevenue * service.commission_rate_applied;
           stats.serviceCommission += commission;
-          stats.totalRevenue += service.price_at_booking;
+          stats.totalRevenue += adjustedRevenue;
         });
       }
     });
@@ -425,12 +440,17 @@ export const useBarberReports = () => {
       }
 
       const stats = monthlyStats.get(monthKey);
+      const originalTotal = appointment.total_price;
+      const finalTotal = appointment.final_amount || appointment.total_price;
+      const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+
       stats.appointmentsCount += 1;
       
       appointment.appointment_services?.forEach((service: any) => {
-        const commission = service.price_at_booking * service.commission_rate_applied;
+        const adjustedRevenue = service.price_at_booking * discountFactor;
+        const commission = adjustedRevenue * service.commission_rate_applied;
         stats.serviceCommission += commission;
-        stats.totalRevenue += service.price_at_booking;
+        stats.totalRevenue += adjustedRevenue;
       });
     });
 
@@ -482,6 +502,7 @@ export const useBarberReports = () => {
         client_id,
         appointment_datetime,
         total_price,
+        final_amount,
         client:clients(id, name)
       `)
       .eq('barber_id', barberId)
@@ -523,7 +544,7 @@ export const useBarberReports = () => {
 
       const stats = clientStats.get(key);
       stats.appointmentsCount += 1;
-      stats.totalSpent += appointment.total_price;
+      stats.totalSpent += (appointment.final_amount || appointment.total_price);
       if (appointment.appointment_datetime > stats.lastVisit) {
         stats.lastVisit = appointment.appointment_datetime;
       }
@@ -577,7 +598,7 @@ export const useBarberReports = () => {
     // Buscar agendamentos com forma de pagamento
     const { data: appointments } = await supabase
       .from('appointments')
-      .select('payment_method, total_price')
+      .select('payment_method, total_price, final_amount')
       .eq('barber_id', barberId)
       .eq('status', 'completed')
       .gte('appointment_datetime', startDate.toISOString())
@@ -597,7 +618,7 @@ export const useBarberReports = () => {
     // Processar agendamentos
     appointments?.forEach(appointment => {
       const method = appointment.payment_method;
-      const revenue = appointment.total_price;
+      const revenue = appointment.final_amount || appointment.total_price;
       totalRevenue += revenue;
 
       if (!paymentStats.has(method)) {

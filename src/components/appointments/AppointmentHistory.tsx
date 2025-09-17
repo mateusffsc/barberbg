@@ -292,7 +292,7 @@ export const AppointmentHistory: React.FC<AppointmentHistoryProps> = ({ classNam
                   <div className="text-right ml-4">
                     <div className="flex items-center space-x-1 text-lg font-bold text-green-600">
                       <DollarSign className="h-5 w-5" />
-                      <span>{formatCurrency(appointment.total_price || 0)}</span>
+                      <span>{formatCurrency(appointment.final_amount || appointment.total_price || 0)}</span>
                     </div>
                   </div>
                 </div>

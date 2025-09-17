@@ -350,7 +350,7 @@ export const Dashboard: React.FC = () => {
       // Agendamentos completados
       let completedApptQuery = supabase
         .from('appointments')
-        .select('total_price')
+        .select('total_price, final_amount')
         .eq('status', 'completed')
         .gte('appointment_datetime', startDate.toISOString())
         .lte('appointment_datetime', endDate.toISOString());
@@ -383,7 +383,8 @@ export const Dashboard: React.FC = () => {
       }
 
       const appointmentsRevenue = (completedApts || []).reduce((sum, apt) => {
-        const price = Number(apt.total_price) || 0;
+        // Usa final_amount se disponível, senão usa total_price
+        const price = Number(apt.final_amount || apt.total_price) || 0;
         return sum + price;
       }, 0);
       
