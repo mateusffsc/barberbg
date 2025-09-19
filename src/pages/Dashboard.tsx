@@ -641,7 +641,7 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  const stats = [
+  const allStats = [
     {
       name: 'Agendamentos Hoje',
       value: allTodayAppointments.length.toString(),
@@ -667,6 +667,11 @@ export const Dashboard: React.FC = () => {
       color: 'bg-purple-500',
     },
   ];
+
+  // Filtrar stats para barbeiros (remover card de clientes cadastrados)
+  const stats = user?.role === 'barber' 
+    ? allStats.filter(stat => stat.name !== 'Clientes Cadastrados')
+    : allStats;
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">

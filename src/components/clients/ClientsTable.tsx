@@ -2,6 +2,7 @@ import React from 'react';
 import { Edit2, Trash2, User, Phone, Mail, Eye } from 'lucide-react';
 import { Client } from '../../types/client';
 import { formatDate } from '../../utils/formatters';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ClientsTableProps {
   clients: Client[];
@@ -18,6 +19,8 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
   onViewHistory,
   onDelete
 }) => {
+  const { user } = useAuth();
+  const isBarber = user?.role === 'barber';
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -113,13 +116,15 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">
-                    <button
-                      onClick={() => onViewHistory(client)}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded-lg hover:bg-blue-50 transition-colors"
-                      title="Ver histórico"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
+                    {!isBarber && (
+                      <button
+                        onClick={() => onViewHistory(client)}
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded-lg hover:bg-blue-50 transition-colors"
+                        title="Ver histórico"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => onEdit(client)}
                       className="text-gray-600 hover:text-gray-900 p-1 rounded-lg hover:bg-gray-100 transition-colors"
