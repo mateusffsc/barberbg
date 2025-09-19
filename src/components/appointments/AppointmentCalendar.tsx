@@ -169,20 +169,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     onEventDrop(event, start, end);
   };
 
-  // Filtrar eventos por período selecionado
+  // Não filtrar eventos - mostrar todos os agendamentos independente do período
   const getFilteredEvents = () => {
-    if (view === Views.WEEK || view === Views.DAY) {
-      const startOfPeriod = view === Views.WEEK 
-        ? moment(date).startOf('week').toDate()
-        : moment(date).startOf('day').toDate();
-      const endOfPeriod = view === Views.WEEK 
-        ? moment(date).endOf('week').toDate()
-        : moment(date).endOf('day').toDate();
-      
-      return events.filter(event => 
-        event.start >= startOfPeriod && event.start <= endOfPeriod
-      );
-    }
+    // Retornar todos os eventos sem filtro de data
     return events;
   };
 

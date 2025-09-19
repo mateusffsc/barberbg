@@ -93,14 +93,10 @@ export const Appointments: React.FC = () => {
 
   const loadAppointments = async () => {
     try {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 30);
-
+      // Remover limitação de 30 dias - buscar todos os agendamentos
       // Passar o barbeiro selecionado para o filtro (apenas para admin)
       const barberId = user?.role === 'admin' ? selectedBarberId : undefined;
-      const result = await fetchAppointments(startDate, endDate, barberId || undefined);
+      const result = await fetchAppointments(undefined, undefined, barberId || undefined);
       setAppointments(result.appointments);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);

@@ -205,26 +205,38 @@ export const useAppointments = () => {
   const generateRecurrenceDates = (startDate: Date, recurrence?: any): Date[] => {
     const dates = [startDate];
     
-    if (!recurrence || recurrence.type === 'none' || !recurrence.occurrences || recurrence.occurrences <= 1) {
+    if (!recurrence || recurrence.type === 'none') {
       return dates;
     }
 
     const interval = recurrence.interval || 1;
-    const maxOccurrences = Math.min(recurrence.occurrences, 52); // Limite de 52 ocorrências
     const endDate = recurrence.end_date ? new Date(recurrence.end_date) : null;
+    
+    // Se há data limite, calcular automaticamente até essa data
+    // Se há número de ocorrências, usar esse limite (máximo 52)
+    let maxOccurrences = 52; // Limite padrão de segurança
+    
+    if (recurrence.occurrences && recurrence.occurrences > 1) {
+      maxOccurrences = Math.min(recurrence.occurrences, 52);
+    } else if (endDate) {
+      // Calcular automaticamente quantas ocorrências cabem até a data limite
+      maxOccurrences = calculateMaxOccurrences(startDate, endDate, recurrence.type, interval);
+    } else if (!recurrence.occurrences || recurrence.occurrences <= 1) {
+      return dates; // Sem recorrência se não há limite nem ocorrências
+    }
 
     for (let i = 1; i < maxOccurrences; i++) {
       const nextDate = new Date(startDate);
       
       switch (recurrence.type) {
         case 'weekly':
-          nextDate.setDate(startDate.getDate() + (i * 7)); // Toda semana (7 dias)
+          nextDate.setDate(startDate.getDate() + (i * 7 * interval));
           break;
         case 'biweekly':
           nextDate.setDate(startDate.getDate() + (i * 14)); // Quinzenal (14 dias)
           break;
         case 'monthly':
-          nextDate.setMonth(startDate.getMonth() + i); // Todo mês
+          nextDate.setMonth(startDate.getMonth() + (i * interval));
           break;
       }
 
@@ -237,6 +249,34 @@ export const useAppointments = () => {
     }
 
     return dates;
+  };
+
+  // Função auxiliar para calcular o número máximo de ocorrências até uma data limite
+  const calculateMaxOccurrences = (startDate: Date, endDate: Date, type: string, interval: number = 1): number => {
+    let count = 1; // Incluir a data inicial
+    const currentDate = new Date(startDate);
+    
+    while (currentDate < endDate && count < 52) { // Limite de segurança
+      switch (type) {
+        case 'weekly':
+          currentDate.setDate(currentDate.getDate() + (7 * interval));
+          break;
+        case 'biweekly':
+          currentDate.setDate(currentDate.getDate() + 14);
+          break;
+        case 'monthly':
+          currentDate.setMonth(currentDate.getMonth() + interval);
+          break;
+        default:
+          return count;
+      }
+      
+      if (currentDate <= endDate) {
+        count++;
+      }
+    }
+    
+    return count;
   };
 
   const updateAppointmentStatus = async (id: number, status: string, paymentMethod?: PaymentMethod, finalAmount?: number): Promise<boolean> => {

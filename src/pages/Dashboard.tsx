@@ -289,37 +289,36 @@ export const Dashboard: React.FC = () => {
       
       setAllTodayAppointments(todayAppointmentsWithServices);
       
-      // Buscar agendamentos do dia atual (a partir de agora até o final do dia)
-      let upcomingQuery = supabase
+      // Buscar todos os agendamentos de hoje (do início ao fim do dia)
+      let todayDisplayQuery = supabase
         .from('appointments')
         .select(`
           *,
-          client:clients(id, name),
+          client:clients(id, name, phone),
           barber:barbers(id, name),
           appointment_services(
-            service:services(id, name)
+            service:services(id, name, price)
           )
         `)
-        .eq('status', 'scheduled')
-        .gte('appointment_datetime', now.toISOString())
+        .gte('appointment_datetime', today.toISOString())
         .lte('appointment_datetime', endOfToday.toISOString())
         .order('appointment_datetime', { ascending: true })
-        .limit(5);
+        .limit(6);
 
       if (user?.role === 'barber' && user.barber?.id) {
-        upcomingQuery = upcomingQuery.eq('barber_id', user.barber.id);
+        todayDisplayQuery = todayDisplayQuery.eq('barber_id', user.barber.id);
       }
 
-      const { data: upcomingApts, error: upcomingError } = await upcomingQuery;
-      if (upcomingError) throw upcomingError;
+      const { data: todayDisplayApts, error: todayDisplayError } = await todayDisplayQuery;
+      if (todayDisplayError) throw todayDisplayError;
 
-      const upcomingAppointmentsWithServices = (upcomingApts || []).map(apt => ({
+      const todayDisplayAppointmentsWithServices = (todayDisplayApts || []).map(apt => ({
         ...apt,
         services: apt.appointment_services?.map((as: any) => as.service) || []
       }));
       
-      console.log('Agendamentos do dia encontrados:', upcomingAppointmentsWithServices.length);
-      setTodayAppointments(upcomingAppointmentsWithServices.slice(0, 3));
+      console.log('Agendamentos do dia encontrados:', todayDisplayAppointmentsWithServices.length);
+      setTodayAppointments(todayDisplayAppointmentsWithServices);
 
       // 2. Buscar total de clientes (sempre total, independente do filtro)
       const { count: clientCount, error: clientError } = await supabase
@@ -775,28 +774,57 @@ export const Dashboard: React.FC = () => {
           <div className="space-y-3 sm:space-y-4">
             {todayAppointments.length > 0 ? (
               todayAppointments.map((appointment) => (
-                <div key={appointment.id} className="flex items-center space-x-3 sm:space-x-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs sm:text-sm font-medium text-gray-700">
+                <div key={appointment.id} className="flex items-start space-x-3 sm:space-x-4 p-4 bg-gray-50 rounded-lg border-l-4 border-blue-500">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm sm:text-base font-semibold text-blue-700">
                       {getInitials(appointment.client?.name || 'Cliente')}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {appointment.client?.name || 'Cliente'}
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {appointment.client?.name || 'Cliente'}
+                      </p>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        appointment.status === 'scheduled' ? 'bg-green-100 text-green-800' :
+                        appointment.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                        appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {appointment.status === 'scheduled' ? 'Agendado' :
+                         appointment.status === 'completed' ? 'Concluído' :
+                         appointment.status === 'cancelled' ? 'Cancelado' :
+                         appointment.status}
+                      </span>
+                    </div>
+                    {appointment.client?.phone && (
+                      <p className="text-xs text-gray-600 mb-1">
+                        📞 {appointment.client.phone}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-600 mb-1">
+                      👤 {appointment.barber?.name || 'Barbeiro não informado'}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {appointment.services?.map(s => s.name).join(' + ') || 'Serviço'}
+                    <p className="text-xs text-gray-500 truncate mb-2">
+                      ✂️ {appointment.services?.map(s => s.name).join(' + ') || 'Serviço'}
                     </p>
-                    <p className="text-xs text-blue-600 font-medium">
-                      {formatDateTime(appointment.appointment_datetime)}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-blue-600 font-medium">
+                        🕒 {formatDateTime(appointment.appointment_datetime)}
+                      </p>
+                      {appointment.services && appointment.services.length > 0 && (
+                        <p className="text-xs font-semibold text-green-600">
+                          💰 R$ {appointment.services.reduce((total, service) => total + (service.price || 0), 0).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-6 sm:py-4 text-gray-500">
-                <p className="text-sm">Nenhum agendamento para hoje</p>
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm font-medium">Nenhum agendamento para hoje</p>
                 <p className="text-xs">Os agendamentos de hoje aparecerão aqui</p>
               </div>
             )}

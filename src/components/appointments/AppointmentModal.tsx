@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User, UserCheck, Scissors, FileText, DollarSign, Plus } from 'lucide-react';
+import { X, Calendar, User, UserCheck, Scissors, FileText, DollarSign, Plus, Search } from 'lucide-react';
 import { AppointmentFormData } from '../../types/appointment';
 import { Client } from '../../types/client';
 import { Barber } from '../../types/barber';
@@ -48,9 +48,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   });
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
-  const [calculatedDuration, setCalculatedDuration] = useState<number>(0);
   const [errors, setErrors] = useState<Partial<AppointmentFormData>>({});
   const [clientSearch, setClientSearch] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showNewClientForm, setShowNewClientForm] = useState(false);
   const [newClientData, setNewClientData] = useState({
@@ -68,93 +68,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   }, [selectedDate]);
 
-  // Recalcular duração quando barbeiro ou serviços mudarem
-  useEffect(() => {
-    const updateDuration = async () => {
-      console.log('useEffect updateDuration chamado:', { 
-        barber_id: formData.barber_id, 
-        selectedServices: selectedServices.length,
-        services: selectedServices.map(s => ({ 
-          id: s.id, 
-          name: s.name, 
-          duration: s.duration_minutes,
-          duration_normal: s.duration_minutes_normal,
-          duration_special: s.duration_minutes_special
-        }))
-      });
-      
-      // Teste para verificar se os campos existem
-       if (selectedServices.length > 0) {
-         console.log('Primeiro serviço completo:', selectedServices[0]);
-         
-         // Teste da função SQL
-         try {
-           const testResult = await supabase.rpc('get_service_duration', {
-             p_service_id: selectedServices[0].id,
-             p_barber_id: formData.barber_id
-           });
-           console.log('Teste da função SQL:', testResult);
-         } catch (testError) {
-           console.error('Erro no teste da função SQL:', testError);
-         }
-       }
-      
-      if (!formData.barber_id || selectedServices.length === 0) {
-        const fallbackDuration = selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
-        console.log('useEffect - Usando fallback duration:', fallbackDuration);
-        setCalculatedDuration(fallbackDuration);
-        return;
-      }
-
-      let totalDuration = 0;
-      
-      // Verificar se o barbeiro selecionado é especial
-      const selectedBarber = barbers.find(b => b.id === formData.barber_id);
-      const isSpecialBarber = selectedBarber?.is_special_barber || false;
-      
-      console.log('Barbeiro selecionado:', { id: formData.barber_id, name: selectedBarber?.name, isSpecial: isSpecialBarber });
-      
-      for (const service of selectedServices) {
-        let serviceDuration = service.duration_minutes; // Fallback padrão
-        
-        // Tentar usar os novos campos se existirem
-        if (service.duration_minutes_normal && service.duration_minutes_special) {
-          serviceDuration = isSpecialBarber ? service.duration_minutes_special : service.duration_minutes_normal;
-          console.log(`Serviço ${service.name}: usando duração ${isSpecialBarber ? 'especial' : 'normal'} = ${serviceDuration} minutos`);
-        } else {
-          // Tentar a função SQL como fallback
-          try {
-            console.log('useEffect - Chamando get_service_duration para:', { service_id: service.id, barber_id: formData.barber_id });
-            const { data: duration, error } = await supabase
-              .rpc('get_service_duration', {
-                p_service_id: service.id,
-                p_barber_id: formData.barber_id
-              });
-            
-            if (error) {
-              console.error('useEffect - Erro na função SQL:', error);
-            } else if (duration) {
-              serviceDuration = duration;
-              console.log('useEffect - Duração retornada pela SQL:', duration, 'para serviço:', service.name);
-            }
-          } catch (error) {
-            console.error('useEffect - Erro ao calcular duração:', error);
-          }
-        }
-        
-        totalDuration += serviceDuration;
-      }
-      console.log('useEffect - Duração total calculada:', totalDuration);
-      setCalculatedDuration(totalDuration);
-    };
-    
-    if (formData.barber_id && selectedServices.length > 0) {
-      updateDuration();
-    } else {
-      setCalculatedDuration(0);
-    }
-  }, [formData.barber_id, selectedServices]);
-
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -171,8 +84,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }
       });
       setSelectedServices([]);
-      setCalculatedDuration(0);
       setClientSearch('');
+      setServiceSearch('');
       setShowNewClientForm(false);
       setNewClientData({ name: '', phone: '', email: '' });
       setNewClientErrors({});
@@ -184,6 +97,10 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     client.name.toLowerCase().includes(clientSearch.toLowerCase())
   );
 
+  const filteredServices = services.filter(service =>
+    service.name.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
+
   const selectedClient = clients.find(c => c.id === formData.client_id);
   const selectedBarber = barbers.find(b => b.id === formData.barber_id);
 
@@ -191,39 +108,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     return selectedServices.reduce((sum, service) => sum + service.price, 0);
   };
 
-  const calculateDuration = async () => {
-    console.log('calculateDuration chamada:', { barber_id: formData.barber_id, selectedServices: selectedServices.length });
-    
-    if (!formData.barber_id || selectedServices.length === 0) {
-      const fallbackDuration = selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
-      console.log('Usando fallback duration:', fallbackDuration);
-      return fallbackDuration;
-    }
-
-    let totalDuration = 0;
-    for (const service of selectedServices) {
-      try {
-        console.log('Chamando get_service_duration para:', { service_id: service.id, barber_id: formData.barber_id });
-        const { data: duration, error } = await supabase
-          .rpc('get_service_duration', {
-            p_service_id: service.id,
-            p_barber_id: formData.barber_id
-          });
-        
-        if (error) {
-          console.error('Erro na função SQL:', error);
-          totalDuration += service.duration_minutes;
-        } else {
-          console.log('Duração retornada pela SQL:', duration, 'para serviço:', service.name);
-          totalDuration += duration || service.duration_minutes;
-        }
-      } catch (error) {
-        console.error('Erro ao calcular duração:', error);
-        totalDuration += service.duration_minutes;
-      }
-    }
-    console.log('Duração total calculada:', totalDuration);
-    return totalDuration;
+  const calculateDuration = () => {
+    return selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
   };
 
   const handleServiceToggle = (service: Service) => {
@@ -261,6 +147,49 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     setNewClientErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateNewClient()) {
+      return;
+    }
+
+    setCreatingClient(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .insert([{
+          name: newClientData.name.trim(),
+          phone: newClientData.phone.trim(),
+          email: newClientData.email.trim() || null
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Atualizar lista de clientes
+      const newClient = data as Client;
+      setClients([...clients, newClient]);
+
+      // Selecionar o novo cliente automaticamente
+      setFormData(prev => ({ ...prev, client_id: newClient.id }));
+      setClientSearch(newClient.name);
+      setShowClientDropdown(false);
+
+      // Resetar formulário e fechar modal
+      setNewClientData({ name: '', phone: '', email: '' });
+      setNewClientErrors({});
+      setShowNewClientForm(false);
+    } catch (error) {
+      console.error('Erro ao criar cliente:', error);
+      setNewClientErrors({ general: 'Erro ao criar cliente. Tente novamente.' });
+    } finally {
+      setCreatingClient(false);
+    }
   };
 
   const validateForm = (): boolean => {
@@ -322,15 +251,51 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         break;
     }
 
+    // Calcular quantos agendamentos serão criados
+    let totalAppointments = 1; // Incluir o agendamento inicial
+    
     if (rec.occurrences && rec.occurrences > 1) {
+      totalAppointments = Math.min(rec.occurrences, 52);
       preview += `, por ${rec.occurrences} vezes`;
-    }
-
-    if (rec.end_date) {
+    } else if (rec.end_date && formData.appointment_datetime) {
+      // Calcular automaticamente quantos agendamentos até a data limite
+      const startDate = new Date(formData.appointment_datetime);
+      const endDate = new Date(rec.end_date);
+      totalAppointments = calculateAppointmentsUntilDate(startDate, endDate, rec.type);
       preview += `, até ${new Date(rec.end_date).toLocaleDateString('pt-BR')}`;
     }
 
+    preview += ` (${totalAppointments} agendamento${totalAppointments > 1 ? 's' : ''} no total)`;
+
     return preview;
+  };
+
+  // Função auxiliar para calcular agendamentos até data limite (para preview)
+  const calculateAppointmentsUntilDate = (startDate: Date, endDate: Date, type: string): number => {
+    let count = 1;
+    const currentDate = new Date(startDate);
+    
+    while (currentDate < endDate && count < 52) {
+      switch (type) {
+        case 'weekly':
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case 'biweekly':
+          currentDate.setDate(currentDate.getDate() + 14);
+          break;
+        case 'monthly':
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        default:
+          return count;
+      }
+      
+      if (currentDate <= endDate) {
+        count++;
+      }
+    }
+    
+    return count;
   };
 
   if (!isOpen) return null;
@@ -361,50 +326,62 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cliente *
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={clientSearch}
-                    onChange={(e) => {
-                      setClientSearch(e.target.value);
-                      setShowClientDropdown(true);
-                      if (!e.target.value) {
-                        setFormData(prev => ({ ...prev, client_id: 0 }));
-                      }
-                    }}
-                    onFocus={() => setShowClientDropdown(true)}
-                    className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
-                      errors.client_id ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Buscar cliente..."
-                    disabled={loading}
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={clientSearch}
+                      onChange={(e) => {
+                        setClientSearch(e.target.value);
+                        setShowClientDropdown(true);
+                        if (!e.target.value) {
+                          setFormData(prev => ({ ...prev, client_id: 0 }));
+                        }
+                      }}
+                      onFocus={() => setShowClientDropdown(true)}
+                      className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                        errors.client_id ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="Buscar cliente..."
+                      disabled={loading}
+                    />
                   
                   {showClientDropdown && clientSearch && (
-                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto">
-                      {filteredClients.length > 0 ? (
-                        filteredClients.map((client) => (
-                          <div
-                            key={client.id}
-                            className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100"
-                            onClick={() => handleClientSelect(client)}
-                          >
-                            <span className="block truncate font-medium">{client.name}</span>
-                            {client.phone && (
-                              <span className="block text-sm text-gray-500">{client.phone}</span>
-                            )}
+                      <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto">
+                        {filteredClients.length > 0 ? (
+                          filteredClients.map((client) => (
+                            <div
+                              key={client.id}
+                              className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100"
+                              onClick={() => handleClientSelect(client)}
+                            >
+                              <span className="block truncate font-medium">{client.name}</span>
+                              {client.phone && (
+                                <span className="block text-sm text-gray-500">{client.phone}</span>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-2 pl-3 pr-9 text-gray-500">
+                            Nenhum cliente encontrado
                           </div>
-                        ))
-                      ) : (
-                        <div className="py-2 pl-3 pr-9 text-gray-500">
-                          Nenhum cliente encontrado
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowNewClientForm(true)}
+                    className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap"
+                    disabled={loading}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Novo Cliente
+                  </button>
                 </div>
                 {errors.client_id && (
                   <p className="mt-1 text-sm text-red-600">{errors.client_id}</p>
@@ -470,32 +447,54 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Serviços *
                 </label>
+                
+                {/* Barra de pesquisa de serviços */}
+                <div className="relative mb-3">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Pesquisar serviços..."
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+                
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {services.map((service) => (
-                    <label key={service.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={selectedServices.some(s => s.id === service.id)}
-                        onChange={() => handleServiceToggle(service)}
-                        className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
-                        disabled={loading}
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900">{service.name}</span>
-                          <span className="text-sm text-gray-600">{formatCurrency(service.price)}</span>
+                  {filteredServices.length > 0 ? (
+                    filteredServices.map((service) => (
+                      <label key={service.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectedServices.some(s => s.id === service.id)}
+                          onChange={() => handleServiceToggle(service)}
+                          className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
+                          disabled={loading}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-900">{service.name}</span>
+                            <span className="text-sm text-gray-600">{formatCurrency(service.price)}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 text-xs text-gray-500">
+                            {service.is_chemical && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                                Química
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs text-gray-500">
-                          <span>{service.duration_minutes} min</span>
-                          {service.is_chemical && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                              Química
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <Scissors className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm">Nenhum serviço encontrado</p>
+                    </div>
+                  )}
                 </div>
                 {errors.service_ids && (
                   <p className="mt-1 text-sm text-red-600">{errors.service_ids}</p>
@@ -509,7 +508,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <div className="space-y-1 text-sm text-gray-600">
                     <div className="flex justify-between">
                       <span>Duração total:</span>
-                <span>{calculatedDuration} minutos</span>
+                      <span>{calculateDuration()} minutos</span>
                     </div>
                     <div className="flex justify-between font-medium text-gray-900">
                       <span>Total:</span>
@@ -588,10 +587,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                           }))}
                           className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                           placeholder="1"
-                          disabled={loading}
+                          disabled={loading || (formData.recurrence?.end_date ? true : false)}
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Quantas vezes repetir este agendamento
+                          {formData.recurrence?.end_date 
+                            ? 'Será calculado automaticamente até a data limite' 
+                            : 'Quantas vezes repetir este agendamento'
+                          }
                         </p>
                       </div>
 
@@ -651,6 +653,123 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Modal de Novo Cliente */}
+      {showNewClientForm && (
+        <div className="fixed inset-0 z-60 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowNewClientForm(false)} />
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full mx-4">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Novo Cliente
+                  </h3>
+                  <button
+                    onClick={() => setShowNewClientForm(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    disabled={creatingClient}
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateClient} className="space-y-4">
+                  {/* Nome */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nome *
+                    </label>
+                    <input
+                      type="text"
+                      value={newClientData.name}
+                      onChange={(e) => setNewClientData(prev => ({ ...prev, name: e.target.value }))}
+                      className={`block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                        newClientErrors.name ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="Nome completo"
+                      disabled={creatingClient}
+                    />
+                    {newClientErrors.name && (
+                      <p className="mt-1 text-sm text-red-600">{newClientErrors.name}</p>
+                    )}
+                  </div>
+
+                  {/* Telefone */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Telefone *
+                    </label>
+                    <input
+                      type="tel"
+                      value={newClientData.phone}
+                      onChange={(e) => setNewClientData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+                      className={`block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                        newClientErrors.phone ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="(11) 99999-9999"
+                      disabled={creatingClient}
+                    />
+                    {newClientErrors.phone && (
+                      <p className="mt-1 text-sm text-red-600">{newClientErrors.phone}</p>
+                    )}
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email (opcional)
+                    </label>
+                    <input
+                      type="email"
+                      value={newClientData.email}
+                      onChange={(e) => setNewClientData(prev => ({ ...prev, email: e.target.value }))}
+                      className={`block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                        newClientErrors.email ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="email@exemplo.com"
+                      disabled={creatingClient}
+                    />
+                    {newClientErrors.email && (
+                      <p className="mt-1 text-sm text-red-600">{newClientErrors.email}</p>
+                    )}
+                  </div>
+                </form>
+                
+                {newClientErrors.general && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{newClientErrors.general}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="submit"
+                  onClick={handleCreateClient}
+                  disabled={creatingClient}
+                  className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-gray-900 text-base font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingClient ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  ) : (
+                    'Criar Cliente'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewClientForm(false)}
+                  disabled={creatingClient}
+                  className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
