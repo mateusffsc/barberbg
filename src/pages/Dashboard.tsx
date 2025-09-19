@@ -883,10 +883,10 @@ export const Dashboard: React.FC = () => {
 
       {/* Modal de Nova Venda */}
       {showSaleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-lg max-w-6xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Nova Venda</h2>
               <button
                 onClick={handleCloseModals}
@@ -898,38 +898,44 @@ export const Dashboard: React.FC = () => {
 
             {/* Content */}
             <div className="flex-1 overflow-hidden">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6 h-full">
+              <div className="flex flex-col lg:grid lg:grid-cols-3 gap-0 lg:gap-6 h-full">
                 {/* Produtos */}
-                <div className="lg:col-span-2 overflow-y-auto">
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
-                    Produtos ({products.length} encontrados)
-                  </h3>
-                  {loadingModalData ? (
-                    <div className="flex items-center justify-center py-8 sm:py-12">
-                      <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
-                      <span className="ml-2 text-sm sm:text-base text-gray-600">Carregando produtos...</span>
-                    </div>
-                  ) : (
-                    <ProductGrid
-                      products={products}
-                      onAddToCart={handleAddToCart}
-                      loading={false}
-                    />
-                  )}
+                <div className="lg:col-span-2 flex-1 lg:flex-none overflow-hidden flex flex-col">
+                  <div className="p-4 sm:p-6 pb-2 sm:pb-3 flex-shrink-0">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900">
+                      Produtos ({products.length} encontrados)
+                    </h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4 sm:pb-6">
+                    {loadingModalData ? (
+                      <div className="flex items-center justify-center py-8 sm:py-12">
+                        <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
+                        <span className="ml-2 text-sm sm:text-base text-gray-600">Carregando produtos...</span>
+                      </div>
+                    ) : (
+                      <ProductGrid
+                        products={products}
+                        onAddToCart={handleAddToCart}
+                        loading={false}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Carrinho */}
-                <div className="lg:col-span-1">
-                  <ShoppingCartComponent
-                    items={cartItems}
-                    selectedClient={selectedClient}
-                    clients={clients}
-                    onUpdateQuantity={handleUpdateCartQuantity}
-                    onRemoveItem={handleRemoveFromCart}
-                    onSelectClient={setSelectedClient}
-                    onFinalizeSale={handleFinalizeSale}
-                    loading={saleLoading}
-                  />
+                <div className="lg:col-span-1 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200">
+                  <div className="h-full p-4 sm:p-6">
+                    <ShoppingCartComponent
+                      items={cartItems}
+                      selectedClient={selectedClient}
+                      clients={clients}
+                      onUpdateQuantity={handleUpdateCartQuantity}
+                      onRemoveItem={handleRemoveFromCart}
+                      onSelectClient={setSelectedClient}
+                      onFinalizeSale={handleFinalizeSale}
+                      loading={saleLoading}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
