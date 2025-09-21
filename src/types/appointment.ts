@@ -17,7 +17,8 @@ export interface Appointment {
   status: AppointmentStatus;
   total_price: number;
   final_amount?: number; // Valor final após desconto/acréscimo
-  duration_minutes?: number;
+  duration_minutes_normal?: number;
+  duration_minutes_special?: number;
   note?: string; // Observações do agendamento
   payment_method?: PaymentMethod;
   created_at: string;
@@ -36,7 +37,8 @@ export interface Appointment {
     id: number;
     name: string;
     price: number;
-    duration_minutes: number;
+    duration_minutes_normal: number;
+    duration_minutes_special: number;
     is_chemical: boolean;
   }>;
 }

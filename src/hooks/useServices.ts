@@ -20,7 +20,7 @@ export const useServices = () => {
 
       let query = supabase
         .from('services')
-        .select('*', { count: 'exact' })
+        .select('id, name, description, price, duration_minutes_normal, duration_minutes_special, is_chemical, created_at, updated_at', { count: 'exact' })
         .range(from, to)
         .order('name');
 
@@ -68,7 +68,6 @@ export const useServices = () => {
           name: serviceData.name.trim(),
           description: serviceData.description.trim() || null,
           price: price,
-          duration_minutes: serviceData.duration_minutes_normal, // Para compatibilidade
           duration_minutes_normal: serviceData.duration_minutes_normal,
           duration_minutes_special: serviceData.duration_minutes_special,
           is_chemical: serviceData.is_chemical
@@ -118,7 +117,6 @@ export const useServices = () => {
           name: serviceData.name.trim(),
           description: serviceData.description.trim() || null,
           price,
-          duration_minutes: serviceData.duration_minutes_normal, // Para compatibilidade
           duration_minutes_normal: serviceData.duration_minutes_normal,
           duration_minutes_special: serviceData.duration_minutes_special,
           is_chemical: serviceData.is_chemical

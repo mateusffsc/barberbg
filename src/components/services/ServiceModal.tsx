@@ -23,7 +23,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     description: '',
     price: '',
     duration_minutes_normal: 30,
-    duration_minutes_special: 40,
+    duration_minutes_special: 30,
     is_chemical: false
   });
   const [errors, setErrors] = useState<Partial<ServiceFormData>>({});
@@ -34,8 +34,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         name: service.name,
         description: service.description || '',
         price: formatCurrencyInput((service.price * 100).toString()), // Converter para formato de entrada
-        duration_minutes_normal: service.duration_minutes_normal || service.duration_minutes || 30,
-        duration_minutes_special: service.duration_minutes_special || 40,
+        duration_minutes_normal: service.duration_minutes_normal || 30,
+    duration_minutes_special: service.duration_minutes_special || 30,
         is_chemical: service.is_chemical
       });
     } else {
@@ -44,7 +44,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         description: '',
         price: '',
         duration_minutes_normal: 30,
-        duration_minutes_special: 40,
+        duration_minutes_special: 30,
         is_chemical: false
       });
     }
@@ -228,7 +228,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
                       errors.duration_minutes_special ? 'border-red-300' : 'border-gray-300'
                     }`}
-                    placeholder="40"
+                    placeholder="30"
                     disabled={loading}
                   />
                 </div>

@@ -128,6 +128,11 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                   <span className="text-gray-700">
                     {formatTime(event.start)} - {formatTime(event.end)} ({duration} min)
                   </span>
+                  {event.resource.appointment.barber?.is_special_barber && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      Horário Especial
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -147,13 +152,20 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
               {/* Barbeiro */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Barbeiro:</label>
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0 h-10 w-10 bg-gray-900 rounded-full flex items-center justify-center">
-                    <UserCheck className="h-5 w-5 text-white" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0 h-10 w-10 bg-gray-900 rounded-full flex items-center justify-center">
+                      <UserCheck className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{event.resource.barber}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-medium text-gray-900">{event.resource.barber}</div>
-                  </div>
+                  {event.resource.appointment.barber?.is_special_barber && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      Barbeiro Especial
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -174,7 +186,6 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                       </div>
                       <div className="text-right">
                         <div className="font-medium text-gray-900">{formatCurrency(service.price)}</div>
-                        <div className="text-xs text-gray-500">{service.duration_minutes} min</div>
                       </div>
                     </div>
                   ))}

@@ -21,41 +21,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('AuthContext: Iniciando verificação de auth');
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
-      console.log('AuthContext: Verificando usuário salvo');
       const savedUser = localStorage.getItem('barbershop_user');
       if (savedUser) {
-        console.log('AuthContext: Usuário encontrado', savedUser);
         setUser(JSON.parse(savedUser));
-      } else {
-        console.log('AuthContext: Nenhum usuário salvo encontrado');
       }
     } catch (error) {
       console.error('AuthContext: Erro ao verificar auth', error);
       localStorage.removeItem('_user');
     } finally {
-      console.log('AuthContext: Finalizando loading');
       setLoading(false);
     }
   };
 
   const signIn = async (username: string, password: string) => {
     try {
-      console.log('AuthContext: Iniciando login para:', username);
       setLoading(true);
       
       // Use the signIn function from lib/supabase.ts
       const userData = await supabaseSignIn(username, password);
-      console.log('AuthContext: Login bem-sucedido:', userData);
       
       setUser(userData);
       localStorage.setItem('barbershop_user', JSON.stringify(userData));
-      console.log('AuthContext: Usuário salvo no localStorage');
       
     } catch (error) {
       console.error('AuthContext: Erro no login:', error);
@@ -68,11 +59,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      console.log('AuthContext: Iniciando logout');
       setLoading(true);
       setUser(null);
       localStorage.removeItem('barbershop_user');
-      console.log('AuthContext: Logout concluído');
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;

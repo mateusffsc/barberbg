@@ -101,7 +101,7 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center text-sm text-gray-600">
                     <Clock className="h-4 w-4 mr-1" />
-                    {formatDuration(service.duration_minutes)}
+                    {formatDuration(service.duration_minutes_normal)}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

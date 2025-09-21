@@ -109,7 +109,23 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   };
 
   const calculateDuration = () => {
-    return selectedServices.reduce((sum, service) => sum + service.duration_minutes, 0);
+    if (!selectedBarber) {
+      return selectedServices.reduce((sum, service) => sum + (service.duration_minutes_normal || 30), 0);
+    }
+
+    return selectedServices.reduce((sum, service) => {
+      let serviceDuration;
+      
+      if (selectedBarber.is_special_barber) {
+        // Barbeiro especial usa duration_minutes_special
+        serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
+      } else {
+        // Barbeiro normal usa duration_minutes_normal
+        serviceDuration = service.duration_minutes_normal || 30;
+      }
+      
+      return sum + serviceDuration;
+    }, 0);
   };
 
   const handleServiceToggle = (service: Service) => {
@@ -508,7 +524,14 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <div className="space-y-1 text-sm text-gray-600">
                     <div className="flex justify-between">
                       <span>Duração total:</span>
-                      <span>{calculateDuration()} minutos</span>
+                      <div className="flex items-center space-x-2">
+                        <span>{calculateDuration()} minutos</span>
+                        {selectedBarber?.is_special_barber && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            Horário Especial
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex justify-between font-medium text-gray-900">
                       <span>Total:</span>

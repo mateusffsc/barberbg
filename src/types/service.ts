@@ -3,7 +3,6 @@ export interface Service {
   name: string;
   description?: string;
   price: number;
-  duration_minutes: number; // Manter para compatibilidade
   duration_minutes_normal: number;
   duration_minutes_special: number;
   is_chemical: boolean;
