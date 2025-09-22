@@ -65,9 +65,6 @@ export const BarbersTable: React.FC<BarbersTableProps> = ({
                 Contato
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Comissões
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -114,21 +111,6 @@ export const BarbersTable: React.FC<BarbersTableProps> = ({
                     {!barber.phone && !barber.email && (
                       <span className="text-sm text-gray-400">Sem contato</span>
                     )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    <div className="flex flex-wrap gap-1">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        S: {Math.round(barber.commission_rate_service * 100)}%
-                      </span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        P: {Math.round(barber.commission_rate_product * 100)}%
-                      </span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        Q: {Math.round(barber.commission_rate_chemical_service * 100)}%
-                      </span>
-                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

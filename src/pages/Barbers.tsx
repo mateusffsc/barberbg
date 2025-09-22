@@ -7,13 +7,9 @@ import { Pagination } from '../components/ui/Pagination';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BarberReportModal } from '../components/appointments/BarberReportModal';
 import { Barber, BarberFormData, BarberUpdateData } from '../types/barber';
-import { useAdminAuth } from '../hooks/useAdminAuth';
-import { AdminPasswordModal } from '../components/ui/AdminPasswordModal';
 import toast, { Toaster } from 'react-hot-toast';
 
 export const Barbers: React.FC = () => {
-  const { isAuthenticated, authenticate, loading: authLoading } = useAdminAuth();
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const {
     barbers,
@@ -44,16 +40,8 @@ export const Barbers: React.FC = () => {
   const totalPages = Math.ceil(totalCount / pageSize);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      setShowPasswordModal(true);
-    }
-  }, [authLoading, isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadBarbers();
-    }
-  }, [currentPage, search, isAuthenticated]);
+    loadBarbers();
+  }, [currentPage, search]);
 
   const loadBarbers = async () => {
     setLoading(true);
@@ -138,32 +126,6 @@ export const Barbers: React.FC = () => {
       setBarberToDelete(null);
     }
   };
-
-  if (authLoading || (loading && !isAuthenticated)) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="space-y-6">
-        <AdminPasswordModal
-          isOpen={showPasswordModal}
-          onClose={() => setShowPasswordModal(false)}
-          onSuccess={() => {
-            authenticate();
-            setShowPasswordModal(false);
-          }}
-          title="Acesso ao Gerenciamento de Barbeiros"
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -255,16 +217,6 @@ export const Barbers: React.FC = () => {
         confirmText="Excluir"
         type="danger"
         loading={deleteLoading}
-      />
-
-      <AdminPasswordModal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        onSuccess={() => {
-          authenticate();
-          setShowPasswordModal(false);
-        }}
-        title="Acesso ao Gerenciamento de Barbeiros"
       />
     </div>
   );
