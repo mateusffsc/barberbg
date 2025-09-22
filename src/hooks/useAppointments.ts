@@ -79,53 +79,63 @@ export const useAppointments = () => {
   };
 
   const createAppointment = async (
-    appointmentData: AppointmentFormData,
+    formData: AppointmentFormData,
     selectedServices: Service[],
     selectedBarber: Barber,
-    recurrence?: any
+    recurrence?: any,
+    allowOverlap?: boolean // Novo parâmetro para permitir sobreposição
   ): Promise<Appointment | null> => {
     try {
       // Calcular total e duração
       const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
-      // Calcular duração total baseada no tipo de barbeiro
+      
+      // Verificar se há duração customizada
       let totalDuration = 0;
-      console.log('🔍 Calculando duração baseada no tipo de barbeiro...');
       
-      // Buscar informações do barbeiro
-      const { data: barberData, error: barberError } = await supabase
-        .from('barbers')
-        .select('is_special_barber')
-        .eq('id', appointmentData.barber_id)
-        .single();
-      
-      if (barberError) {
-        console.error('❌ Erro ao buscar barbeiro:', barberError);
-        // Fallback: usar duração padrão
-        totalDuration = selectedServices.reduce((sum, service) => sum + (service.duration_minutes_normal || 30), 0);
+      if (formData.custom_duration && formData.custom_duration > 0) {
+        // Usar duração customizada
+        totalDuration = formData.custom_duration;
+        console.log(`⏱️ Usando duração customizada: ${totalDuration} minutos`);
       } else {
-        const isSpecialBarber = barberData?.is_special_barber || false;
-        console.log(`👨‍💼 Barbeiro especial: ${isSpecialBarber ? 'SIM' : 'NÃO'}`);
+        // Calcular duração total baseada no tipo de barbeiro
+        console.log('🔍 Calculando duração baseada no tipo de barbeiro...');
         
-        // Calcular duração para cada serviço
-        for (const service of selectedServices) {
-          let serviceDuration;
+        // Buscar informações do barbeiro
+        const { data: barberData, error: barberError } = await supabase
+          .from('barbers')
+          .select('is_special_barber')
+          .eq('id', formData.barber_id)
+          .single();
+        
+        if (barberError) {
+          console.error('❌ Erro ao buscar barbeiro:', barberError);
+          // Fallback: usar duração padrão
+          totalDuration = selectedServices.reduce((sum, service) => sum + (service.duration_minutes_normal || 30), 0);
+        } else {
+          const isSpecialBarber = barberData?.is_special_barber || false;
+          console.log(`👨‍💼 Barbeiro especial: ${isSpecialBarber ? 'SIM' : 'NÃO'}`);
           
-          console.log(`🔍 Analisando serviço "${service.name}":`, {
-            duration_minutes_normal: service.duration_minutes_normal,
-            duration_minutes_special: service.duration_minutes_special
-          });
-          
-          if (isSpecialBarber) {
-            // Barbeiro especial usa duration_minutes_special
-            serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
-            console.log(`⏱️ Serviço "${service.name}": ${serviceDuration} min (especial)`);
-          } else {
-            // Barbeiro normal usa duration_minutes_normal
-            serviceDuration = service.duration_minutes_normal || 30;
-            console.log(`⏱️ Serviço "${service.name}": ${serviceDuration} min (normal)`);
+          // Calcular duração para cada serviço
+          for (const service of selectedServices) {
+            let serviceDuration;
+            
+            console.log(`🔍 Analisando serviço "${service.name}":`, {
+              duration_minutes_normal: service.duration_minutes_normal,
+              duration_minutes_special: service.duration_minutes_special
+            });
+            
+            if (isSpecialBarber) {
+              // Barbeiro especial usa duration_minutes_special
+              serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
+              console.log(`⏱️ Serviço "${service.name}": ${serviceDuration} min (especial)`);
+            } else {
+              // Barbeiro normal usa duration_minutes_normal
+              serviceDuration = service.duration_minutes_normal || 30;
+              console.log(`⏱️ Serviço "${service.name}": ${serviceDuration} min (normal)`);
+            }
+            
+            totalDuration += serviceDuration;
           }
-          
-          totalDuration += serviceDuration;
         }
       }
       
@@ -134,11 +144,11 @@ export const useAppointments = () => {
       // Gerar datas dos agendamentos baseado na recorrência
       // Usar função que não converte timezone
       const appointmentDates = generateRecurrenceDates(
-        fromLocalDateTimeString(appointmentData.appointment_datetime),
+        fromLocalDateTimeString(formData.appointment_datetime),
         recurrence
       );
       
-      console.log('Data original do form:', appointmentData.appointment_datetime);
+      console.log('Data original do form:', formData.appointment_datetime);
       console.log('Data convertida:', appointmentDates[0]);
       console.log('Data que será salva:', toLocalISOString(appointmentDates[0]));
 
@@ -146,28 +156,49 @@ export const useAppointments = () => {
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('name, phone')
-        .eq('id', appointmentData.client_id)
+        .eq('id', formData.client_id)
         .single();
 
       if (clientError) throw clientError;
 
-      // Verificar conflitos para todas as datas
+      // Verificar conflitos para todas as datas (apenas se não permitir sobreposição)
+      const conflictingAppointments = [];
+      
       for (const date of appointmentDates) {
         const startTime = date;
         const endTime = new Date(startTime.getTime() + totalDuration * 60000);
 
         const { data: conflicts } = await supabase
           .from('appointments')
-          .select('id')
-          .eq('barber_id', appointmentData.barber_id)
+          .select('id, client_name, appointment_datetime, duration_minutes')
+          .eq('barber_id', formData.barber_id)
           .eq('status', 'scheduled')
           .gte('appointment_datetime', toLocalISOString(startTime))
           .lt('appointment_datetime', toLocalISOString(endTime));
 
         if (conflicts && conflicts.length > 0) {
-          toast.error(`Conflito de horário em ${startTime.toLocaleDateString('pt-BR')}`);
-          return null;
+          if (!allowOverlap) {
+            // Se não permitir sobreposição, retornar informações do conflito
+            const conflictInfo = {
+              date: startTime,
+              conflicts: conflicts.map(c => ({
+                id: c.id,
+                client_name: c.client_name,
+                appointment_datetime: c.appointment_datetime,
+                duration_minutes: c.duration_minutes
+              }))
+            };
+            conflictingAppointments.push(conflictInfo);
+          }
+          // Se permitir sobreposição, continuar normalmente
         }
+      }
+
+      // Se houver conflitos e não permitir sobreposição, retornar erro com detalhes
+      if (conflictingAppointments.length > 0 && !allowOverlap) {
+        const error = new Error('Conflitos de agenda encontrados - conflitos encontrados');
+        (error as any).conflicts = conflictingAppointments;
+        throw error;
       }
 
       // Criar agendamentos para todas as datas
@@ -178,8 +209,8 @@ export const useAppointments = () => {
         const { data: appointment, error: appointmentError } = await supabase
           .from('appointments')
           .insert({
-            client_id: appointmentData.client_id,
-            barber_id: appointmentData.barber_id,
+            client_id: formData.client_id,
+            barber_id: formData.barber_id,
             client_name: clientData.name,
             client_phone: clientData.phone,
             barber_name: selectedBarber.name,
@@ -190,7 +221,8 @@ export const useAppointments = () => {
             appointment_time: date.toTimeString().split(' ')[0], // HH:MM:SS
             status: 'scheduled',
             total_price: totalPrice,
-            note: appointmentData.note.trim() || null
+            duration_minutes: totalDuration, // Salvar duração calculada (customizada ou padrão)
+            note: formData.note?.trim() || null
           })
           .select()
           .single();
@@ -367,6 +399,107 @@ export const useAppointments = () => {
     }
   };
 
+  const updateAppointment = async (
+    appointmentId: number,
+    updateData: {
+      client_id: number;
+      barber_id: number;
+      service_ids: number[];
+      appointment_date: string;
+      appointment_time: string;
+      custom_duration?: number | null;
+      note?: string;
+    }
+  ): Promise<boolean> => {
+    try {
+      // Buscar serviços selecionados
+      const { data: services, error: servicesError } = await supabase
+        .from('services')
+        .select('*')
+        .in('id', updateData.service_ids);
+
+      if (servicesError) throw servicesError;
+
+      // Buscar barbeiro
+      const { data: barber, error: barberError } = await supabase
+        .from('barbers')
+        .select('*')
+        .eq('id', updateData.barber_id)
+        .single();
+
+      if (barberError) throw barberError;
+
+      // Calcular total e duração
+      const totalPrice = services.reduce((sum, service) => sum + service.price, 0);
+      
+      let totalDuration = 0;
+      if (updateData.custom_duration && updateData.custom_duration > 0) {
+        totalDuration = updateData.custom_duration;
+      } else {
+        const isSpecialBarber = barber.is_special_barber || false;
+        totalDuration = services.reduce((sum, service) => {
+          const serviceDuration = isSpecialBarber 
+            ? (service.duration_minutes_special || service.duration_minutes_normal || 30)
+            : (service.duration_minutes_normal || 30);
+          return sum + serviceDuration;
+        }, 0);
+      }
+
+      // Criar datetime combinando data e hora mantendo o horário local
+      const appointmentDateTime = `${updateData.appointment_date}T${updateData.appointment_time}:00`;
+
+      // Atualizar agendamento
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({
+          client_id: updateData.client_id,
+          barber_id: updateData.barber_id,
+          appointment_datetime: appointmentDateTime,
+          total_price: totalPrice,
+          duration_minutes: updateData.custom_duration || totalDuration,
+          note: updateData.note || null
+        })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      // Remover serviços antigos
+      const { error: deleteServicesError } = await supabase
+        .from('appointment_services')
+        .delete()
+        .eq('appointment_id', appointmentId);
+
+      if (deleteServicesError) throw deleteServicesError;
+
+      // Adicionar novos serviços
+      const appointmentServices = services.map(service => {
+        const commissionRate = service.is_chemical 
+          ? barber.commission_rate_chemical_service
+          : barber.commission_rate_service;
+
+        return {
+          appointment_id: appointmentId,
+          service_id: service.id,
+          price_at_booking: service.price,
+          commission_rate_applied: commissionRate
+        };
+      });
+
+      const { error: insertServicesError } = await supabase
+        .from('appointment_services')
+        .insert(appointmentServices);
+
+      if (insertServicesError) throw insertServicesError;
+
+      toast.success('Agendamento atualizado com sucesso!');
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao atualizar agendamento:', error);
+      toast.error('Erro ao atualizar agendamento');
+      return false;
+    }
+  };
+
   const deleteAppointment = async (id: number): Promise<boolean> => {
     try {
       // Primeiro deletar os serviços do agendamento
@@ -399,36 +532,42 @@ export const useAppointments = () => {
     return appointments.map(appointment => {
       const startTime = new Date(appointment.appointment_datetime);
       
-      // Calcular duração total baseada no tipo de barbeiro
-       let totalDuration = 0;
-       if (appointment.services && appointment.services.length > 0) {
-         const isSpecialBarber = appointment.barber?.is_special_barber || false;
-         
-         console.log(`🔍 Convertendo para calendário - Barbeiro especial: ${isSpecialBarber ? 'SIM' : 'NÃO'}`);
-         
-         totalDuration = appointment.services.reduce((sum, service) => {
-           let serviceDuration;
-           
-           console.log(`🔍 Serviço "${service.name}":`, {
-             duration_minutes_normal: service.duration_minutes_normal,
-             duration_minutes_special: service.duration_minutes_special
-           });
-           
-           if (isSpecialBarber) {
-             // Barbeiro especial usa duration_minutes_special
-             serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
-             console.log(`⏱️ Usando ${serviceDuration} min (especial)`);
-           } else {
-             // Barbeiro normal usa duration_minutes_normal
-             serviceDuration = service.duration_minutes_normal || 30;
-             console.log(`⏱️ Usando ${serviceDuration} min (normal)`);
-           }
-           
-           return sum + serviceDuration;
-         }, 0);
-       } else {
-         totalDuration = 30; // Fallback
-       }
+      // Usar duração salva no banco ou calcular baseada no tipo de barbeiro
+      let totalDuration = 0;
+      
+      if (appointment.duration_minutes && appointment.duration_minutes > 0) {
+        // Usar duração salva no banco (customizada ou padrão)
+        totalDuration = appointment.duration_minutes;
+        console.log(`⏱️ Usando duração do banco: ${totalDuration} minutos`);
+      } else if (appointment.services && appointment.services.length > 0) {
+        // Fallback: calcular duração baseada no tipo de barbeiro
+        const isSpecialBarber = appointment.barber?.is_special_barber || false;
+        
+        console.log(`🔍 Convertendo para calendário - Barbeiro especial: ${isSpecialBarber ? 'SIM' : 'NÃO'}`);
+        
+        totalDuration = appointment.services.reduce((sum, service) => {
+          let serviceDuration;
+          
+          console.log(`🔍 Serviço "${service.name}":`, {
+            duration_minutes_normal: service.duration_minutes_normal,
+            duration_minutes_special: service.duration_minutes_special
+          });
+          
+          if (isSpecialBarber) {
+            // Barbeiro especial usa duration_minutes_special
+            serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
+            console.log(`⏱️ Usando ${serviceDuration} min (especial)`);
+          } else {
+            // Barbeiro normal usa duration_minutes_normal
+            serviceDuration = service.duration_minutes_normal || 30;
+            console.log(`⏱️ Usando ${serviceDuration} min (normal)`);
+          }
+          
+          return sum + serviceDuration;
+        }, 0);
+      } else {
+        totalDuration = 30; // Fallback
+      }
       
       const endTime = new Date(startTime.getTime() + totalDuration * 60000);
 
@@ -461,6 +600,7 @@ export const useAppointments = () => {
     setTotalCount,
     fetchAppointments,
     createAppointment,
+    updateAppointment,
     updateAppointmentStatus,
     rescheduleAppointment,
     deleteAppointment,

@@ -467,6 +467,30 @@
   .rbc-time-header-content {
     margin-left: 60px;
   }
+
+  /* Melhorias para eventos sobrepostos no mobile */
+  .rbc-event {
+    border-radius: 4px !important;
+    margin: 1px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Garantir que eventos sobrepostos tenham espaçamento adequado */
+  .rbc-time-view .rbc-event {
+    margin: 1px 2px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Melhor legibilidade em eventos estreitos */
+  .rbc-event-content {
+    font-size: 10px !important;
+    line-height: 1.1 !important;
+    padding: 2px 4px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
 }
 /* ==
 = CORES POR STATUS DE AGENDAMENTO === */

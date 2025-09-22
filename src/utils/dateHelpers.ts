@@ -24,8 +24,13 @@ export const fromLocalDateTimeString = (dateTimeString: string): Date => {
   // Remove qualquer indicação de timezone para forçar interpretação local
   const cleanString = dateTimeString.replace(/[+-]\d{2}:?\d{2}$|Z$/, '');
   
-  // Cria nova data interpretando como horário local
-  const date = new Date(cleanString);
+  // Parse manual para garantir interpretação local correta
+  const [datePart, timePart] = cleanString.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes, seconds = 0] = timePart.split(':').map(Number);
+  
+  // Criar data usando construtor que interpreta como horário local
+  const date = new Date(year, month - 1, day, hours, minutes, seconds);
   
   return date;
 };

@@ -17,6 +17,7 @@ export interface Appointment {
   status: AppointmentStatus;
   total_price: number;
   final_amount?: number; // Valor final após desconto/acréscimo
+  duration_minutes?: number; // Duração do agendamento em minutos (customizada ou padrão)
   duration_minutes_normal?: number;
   duration_minutes_special?: number;
   note?: string; // Observações do agendamento
@@ -51,6 +52,7 @@ export interface AppointmentFormData {
   appointment_time?: string; // Opcional - formato HH:MM
   service_ids: number[];
   note: string; // Observações do agendamento
+  custom_duration?: number; // Duração customizada em minutos
   recurrence?: {
     type: 'none' | 'daily' | 'weekly' | 'monthly';
     interval: number;

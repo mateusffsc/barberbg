@@ -9,6 +9,7 @@ import { AppointmentModal } from '../components/appointments/AppointmentModal';
 import { AppointmentDetailsModal } from '../components/appointments/AppointmentDetailsModal';
 import { AppointmentHistory } from '../components/appointments/AppointmentHistory';
 import { PaymentMethodModal } from '../components/ui/PaymentMethodModal';
+import { ConflictModal } from '../components/appointments/ConflictModal';
 import { CalendarEvent } from '../types/appointment';
 import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +23,7 @@ export const Appointments: React.FC = () => {
     setAppointments,
     fetchAppointments,
     createAppointment,
+    updateAppointment,
     updateAppointmentStatus,
     convertToCalendarEvents
   } = useAppointments();
@@ -56,6 +58,11 @@ export const Appointments: React.FC = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [appointmentToComplete, setAppointmentToComplete] = useState<CalendarEvent | null>(null);
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar');
+  
+  // Estados para modal de conflito
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictData, setConflictData] = useState<any>(null);
+  const [pendingAppointmentData, setPendingAppointmentData] = useState<any>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -89,6 +96,39 @@ export const Appointments: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Funções para modal de conflito
+  const handleConflictConfirm = async () => {
+    if (!pendingAppointmentData) return;
+    
+    setModalLoading(true);
+    try {
+      const { formData, selectedServices, selectedBarber, recurrence } = pendingAppointmentData;
+      
+      // Criar agendamento com allowOverlap = true
+      const appointment = await createAppointment(formData, selectedServices, selectedBarber, recurrence, true);
+      
+      if (appointment) {
+        await loadAppointments();
+        setIsModalOpen(false);
+        setConflictModalOpen(false);
+        toast.success('Agendamento criado com encaixe!');
+      }
+    } catch (error) {
+      console.error('Erro ao criar agendamento com encaixe:', error);
+      toast.error('Erro ao criar agendamento com encaixe');
+    } finally {
+      setModalLoading(false);
+      setPendingAppointmentData(null);
+      setConflictData(null);
+    }
+  };
+
+  const handleConflictCancel = () => {
+    setConflictModalOpen(false);
+    setPendingAppointmentData(null);
+    setConflictData(null);
   };
 
   const loadAppointments = async () => {
@@ -159,9 +199,32 @@ export const Appointments: React.FC = () => {
         setIsModalOpen(false);
         toast.success('Agendamento criado com sucesso!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar agendamento:', error);
-      toast.error('Erro ao criar agendamento');
+      
+      // Verificar se é um erro de conflito
+      if (error.message && error.message.includes('conflitos encontrados')) {
+        // Extrair dados dos conflitos do erro
+        const conflictInfo = error.conflicts || [];
+        setConflictData({
+          newAppointment: {
+            client: selectedServices[0] ? `Cliente ID: ${formData.client_id}` : 'Cliente não identificado',
+            barber: selectedBarber.name,
+            datetime: formData.appointment_datetime,
+            services: selectedServices.map(s => s.name).join(', '),
+            duration: formData.custom_duration || selectedServices.reduce((total, service) => total + (service.duration || 30), 0)
+          },
+          conflicts: conflictInfo
+        });
+        
+        // Salvar dados do agendamento pendente
+        setPendingAppointmentData({ formData, selectedServices, selectedBarber, recurrence });
+        
+        // Abrir modal de conflito
+        setConflictModalOpen(true);
+      } else {
+        toast.error('Erro ao criar agendamento');
+      }
     } finally {
       setModalLoading(false);
     }
@@ -422,7 +485,11 @@ export const Appointments: React.FC = () => {
         onClose={() => setIsDetailsModalOpen(false)}
         event={selectedEvent}
         onStatusChange={handleStatusChange}
+        onUpdateAppointment={updateAppointment}
         canChangeStatus={true}
+        clients={clients}
+        barbers={barbers}
+        services={services}
       />
 
       <PaymentMethodModal
@@ -434,6 +501,14 @@ export const Appointments: React.FC = () => {
         onSelect={handlePaymentSelection}
         title="Finalizar Agendamento"
         amount={appointmentToComplete?.resource.total || 0}
+        loading={modalLoading}
+      />
+
+      <ConflictModal
+        isOpen={conflictModalOpen}
+        onClose={handleConflictCancel}
+        onConfirm={handleConflictConfirm}
+        conflictData={conflictData}
         loading={modalLoading}
       />
     </div>

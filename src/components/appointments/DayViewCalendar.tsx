@@ -26,6 +26,55 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
     moment(event.start).format('YYYY-MM-DD') === moment(date).format('YYYY-MM-DD')
   );
 
+  // Função para detectar sobreposições entre eventos
+  const detectOverlaps = (events: CalendarEvent[]) => {
+    const overlaps: { [key: string]: { column: number; totalColumns: number } } = {};
+    
+    // Ordenar eventos por horário de início
+    const sortedEvents = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
+    
+    for (let i = 0; i < sortedEvents.length; i++) {
+      const currentEvent = sortedEvents[i];
+      const currentStart = currentEvent.start.getTime();
+      const currentEnd = currentEvent.end.getTime();
+      
+      // Encontrar eventos que se sobrepõem
+      const overlappingEvents = sortedEvents.filter(event => {
+        const eventStart = event.start.getTime();
+        const eventEnd = event.end.getTime();
+        
+        return (
+          (eventStart < currentEnd && eventEnd > currentStart) || // Sobreposição parcial
+          (eventStart >= currentStart && eventEnd <= currentEnd) || // Evento dentro do atual
+          (eventStart <= currentStart && eventEnd >= currentEnd) // Evento engloba o atual
+        );
+      });
+      
+      if (overlappingEvents.length > 1) {
+        // Organizar em colunas
+        overlappingEvents.forEach((event, index) => {
+          if (!overlaps[event.id]) {
+            overlaps[event.id] = {
+              column: index,
+              totalColumns: overlappingEvents.length
+            };
+          }
+        });
+      } else {
+        // Evento sem sobreposição
+        overlaps[currentEvent.id] = {
+          column: 0,
+          totalColumns: 1
+        };
+      }
+    }
+    
+    return overlaps;
+  };
+
+  // Detectar sobreposições dos eventos do dia
+  const eventOverlaps = detectOverlaps(dayEvents);
+
   // Função para calcular a posição e altura do evento
   const getEventStyle = (event: CalendarEvent) => {
     const startMinutes = event.start.getHours() * 60 + event.start.getMinutes();
@@ -37,9 +86,18 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
     const top = ((startMinutes - dayStartMinutes) / 60) * 50; // 50px por hora para mobile
     const height = (duration / 60) * 50; // 50px por hora para mobile
 
+    // Obter informações de sobreposição
+    const overlap = eventOverlaps[event.id] || { column: 0, totalColumns: 1 };
+    
+    // Calcular largura e posição horizontal para eventos sobrepostos
+    const width = 100 / overlap.totalColumns;
+    const left = (overlap.column * width);
+
     return {
       top: `${top}px`,
       height: `${Math.max(height, 40)}px`, // Altura mínima de 40px para mobile
+      width: `${width}%`,
+      left: `${left}%`,
     };
   };
 
@@ -114,7 +172,7 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
                 return (
                   <div
                     key={event.id}
-                    className={`absolute left-0.5 right-0.5 rounded-md border-l-3 shadow-sm cursor-pointer pointer-events-auto ${colorClass} hover:shadow-md transition-all duration-200 active:scale-95`}
+                    className={`absolute rounded-md border-l-3 shadow-sm cursor-pointer pointer-events-auto ${colorClass} hover:shadow-md transition-all duration-200 active:scale-95`}
                     style={{
                       ...style,
                       minHeight: '40px', // Altura mínima reduzida para mobile

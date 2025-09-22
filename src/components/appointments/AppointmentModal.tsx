@@ -48,6 +48,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   });
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [customDuration, setCustomDuration] = useState<number | null>(null);
+  const [useCustomDuration, setUseCustomDuration] = useState(false);
   const [errors, setErrors] = useState<Partial<AppointmentFormData>>({});
   const [clientSearch, setClientSearch] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
@@ -84,6 +86,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }
       });
       setSelectedServices([]);
+      setCustomDuration(null);
+      setUseCustomDuration(false);
       setClientSearch('');
       setServiceSearch('');
       setShowNewClientForm(false);
@@ -109,6 +113,11 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   };
 
   const calculateDuration = () => {
+    // Se está usando duração customizada, retorna ela
+    if (useCustomDuration && customDuration !== null) {
+      return customDuration;
+    }
+
     if (!selectedBarber) {
       return selectedServices.reduce((sum, service) => sum + (service.duration_minutes_normal || 30), 0);
     }
@@ -227,6 +236,15 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       newErrors.service_ids = 'Selecione pelo menos um serviço' as any;
     }
 
+    // Validar duração customizada se estiver habilitada
+    if (useCustomDuration) {
+      if (!customDuration || customDuration <= 0) {
+        newErrors.custom_duration = 'Duração customizada deve ser maior que 0' as any;
+      } else if (customDuration > 480) { // Máximo de 8 horas
+        newErrors.custom_duration = 'Duração customizada não pode exceder 480 minutos (8 horas)' as any;
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -237,7 +255,14 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     if (!validateForm() || !selectedBarber) return;
 
     try {
-      await onSubmit(formData, selectedServices, selectedBarber, formData.recurrence);
+      // Preparar dados do formulário incluindo duração customizada
+      const appointmentData: AppointmentFormData = {
+        ...formData,
+        service_ids: selectedServices.map(s => s.id),
+        custom_duration: useCustomDuration ? customDuration : undefined
+      };
+      
+      await onSubmit(appointmentData, selectedServices, selectedBarber, formData.recurrence);
       onClose();
     } catch (error) {
       console.error('Erro ao salvar agendamento:', error);
@@ -520,12 +545,98 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               {/* Resumo */}
               {selectedServices.length > 0 && (
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Resumo</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">Resumo</h4>
+                  
+                  {/* Controle de duração customizada */}
+                  <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useCustomDuration}
+                          onChange={(e) => {
+                            setUseCustomDuration(e.target.checked);
+                            if (!e.target.checked) {
+                              setCustomDuration(null);
+                            } else {
+                              // Inicializa com a duração padrão calculada
+                              const defaultDuration = selectedServices.reduce((sum, service) => {
+                                if (!selectedBarber) {
+                                  return sum + (service.duration_minutes_normal || 30);
+                                }
+                                
+                                let serviceDuration;
+                                if (selectedBarber.is_special_barber) {
+                                  serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
+                                } else {
+                                  serviceDuration = service.duration_minutes_normal || 30;
+                                }
+                                return sum + serviceDuration;
+                              }, 0);
+                              setCustomDuration(defaultDuration);
+                            }
+                          }}
+                          className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
+                          disabled={loading}
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Ajustar duração manualmente
+                        </span>
+                      </label>
+                    </div>
+                    
+                    {useCustomDuration && (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            min="5"
+                            max="480"
+                            step="5"
+                            value={customDuration || ''}
+                            onChange={(e) => setCustomDuration(parseInt(e.target.value) || null)}
+                            className={`block w-24 px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                              errors.custom_duration ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="30"
+                            disabled={loading}
+                          />
+                          <span className="text-sm text-gray-600">minutos</span>
+                          <span className="text-xs text-gray-500">
+                            (Padrão: {selectedServices.reduce((sum, service) => {
+                              if (!selectedBarber) {
+                                return sum + (service.duration_minutes_normal || 30);
+                              }
+                              
+                              let serviceDuration;
+                              if (selectedBarber.is_special_barber) {
+                                serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
+                              } else {
+                                serviceDuration = service.duration_minutes_normal || 30;
+                              }
+                              return sum + serviceDuration;
+                            }, 0)} min)
+                          </span>
+                        </div>
+                        {errors.custom_duration && (
+                          <p className="text-sm text-red-600">{errors.custom_duration}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="space-y-1 text-sm text-gray-600">
                     <div className="flex justify-between">
                       <span>Duração total:</span>
                       <div className="flex items-center space-x-2">
-                        <span>{calculateDuration()} minutos</span>
+                        <span className={useCustomDuration ? 'font-medium text-blue-600' : ''}>
+                          {calculateDuration()} minutos
+                        </span>
+                        {useCustomDuration && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Customizado
+                          </span>
+                        )}
                         {selectedBarber?.is_special_barber && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                             Horário Especial
