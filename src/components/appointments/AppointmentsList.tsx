@@ -127,7 +127,11 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
               {dateEvents.map(event => (
                 <div
                   key={event.id}
-                  className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+                  className={`rounded-lg border shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98] ${
+                    event.resource.isBlock 
+                      ? 'bg-red-50 border-red-200' 
+                      : 'bg-white border-gray-200'
+                  }`}
                   onClick={() => onSelectEvent(event)}
                 >
                   <div className="p-3">
@@ -140,8 +144,12 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(event.resource.status)}`}>
-                          {getStatusText(event.resource.status)}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                          event.resource.isBlock 
+                            ? 'bg-red-100 text-red-800 border-red-200'
+                            : getStatusColor(event.resource.status)
+                        }`}>
+                          {event.resource.isBlock ? 'Bloqueio' : getStatusText(event.resource.status)}
                         </span>
                         <button
                           onClick={(e) => {
@@ -157,11 +165,11 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
 
                     {/* Informações principais */}
                     <div className="space-y-2 mb-3">
-                      {/* Cliente */}
+                      {/* Cliente ou Título do Bloqueio */}
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-900 truncate">
-                          {event.resource.client}
+                          {event.resource.isBlock ? event.title : event.resource.client}
                         </span>
                       </div>
 
@@ -174,28 +182,47 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                       </div>
                     </div>
 
-                    {/* Serviços */}
-                    <div className="mb-3">
-                      <div className="flex flex-wrap gap-1">
-                        {event.resource.services.map((service, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 max-w-full truncate"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                    {/* Serviços ou Motivo do Bloqueio */}
+                    {!event.resource.isBlock ? (
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(event.resource.services || []).map((service, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 max-w-full truncate"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    ) : event.resource.blockData?.reason && (
+                      <div className="mb-3">
+                        <div className="flex items-start space-x-2">
+                          <span className="text-xs text-gray-500">Motivo:</span>
+                          <span className="text-xs text-gray-700 flex-1">
+                            {event.resource.blockData.reason}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Footer com total e duração */}
                     <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                      <div className="flex items-center space-x-1">
-                        <DollarSign className="h-4 w-4 text-green-600 flex-shrink-0" />
-                        <span className="text-sm font-medium text-green-600">
-                          {formatCurrency(event.resource.total)}
-                        </span>
-                      </div>
+                      {!event.resource.isBlock ? (
+                        <div className="flex items-center space-x-1">
+                          <DollarSign className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <span className="text-sm font-medium text-green-600">
+                            {formatCurrency(event.resource.total)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1">
+                          <span className="text-sm font-medium text-red-600">
+                            Horário Bloqueado
+                          </span>
+                        </div>
+                      )}
                       <span className="text-xs text-gray-500 flex-shrink-0">
                         {Math.round((event.end.getTime() - event.start.getTime()) / 60000)} min
                       </span>

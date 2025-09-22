@@ -168,6 +168,7 @@ export const useAppointments = () => {
         const startTime = date;
         const endTime = new Date(startTime.getTime() + totalDuration * 60000);
 
+        // Verificar conflitos com outros agendamentos
         const { data: conflicts } = await supabase
           .from('appointments')
           .select('id, client_name, appointment_datetime, duration_minutes')
@@ -175,6 +176,32 @@ export const useAppointments = () => {
           .eq('status', 'scheduled')
           .gte('appointment_datetime', toLocalISOString(startTime))
           .lt('appointment_datetime', toLocalISOString(endTime));
+
+        // Verificar conflitos com bloqueios de agenda
+        const appointmentDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
+        const appointmentTime = startTime.toTimeString().split(' ')[0]; // HH:MM:SS
+        const appointmentEndTime = endTime.toTimeString().split(' ')[0]; // HH:MM:SS
+
+        const { data: blocks } = await supabase
+          .from('schedule_blocks')
+          .select('id, reason, start_time, end_time, barber_id')
+          .eq('block_date', appointmentDate)
+          .or(`barber_id.eq.${formData.barber_id},barber_id.is.null`) // Bloqueio específico ou geral
+          .or(`and(start_time.lte.${appointmentTime},end_time.gt.${appointmentTime}),and(start_time.lt.${appointmentEndTime},end_time.gte.${appointmentEndTime}),and(start_time.gte.${appointmentTime},end_time.lte.${appointmentEndTime})`);
+
+        if (blocks && blocks.length > 0) {
+          const blockInfo = {
+            date: startTime,
+            blocks: blocks.map(b => ({
+              id: b.id,
+              reason: b.reason || 'Período bloqueado',
+              start_time: b.start_time,
+              end_time: b.end_time,
+              is_general: b.barber_id === null
+            }))
+          };
+          conflictingAppointments.push(blockInfo);
+        }
 
         if (conflicts && conflicts.length > 0) {
           if (!allowOverlap) {
@@ -500,7 +527,77 @@ export const useAppointments = () => {
     }
   };
 
-  const deleteAppointment = async (id: number): Promise<boolean> => {
+  // Função para lidar com bloqueio de agenda
+  const handleBlockSchedule = async (blockData: { date: string; startTime: string; endTime: string; reason?: string }) => {
+    try {
+      // Aqui implementaremos a lógica para salvar o bloqueio no banco de dados
+      console.log('Bloqueio criado:', blockData);
+      toast.success('Período bloqueado com sucesso!');
+      setShowBlockModal(false);
+      // Recarregar agendamentos para refletir o bloqueio
+      await loadAppointments();
+    } catch (error) {
+      console.error('Erro ao criar bloqueio:', error);
+      toast.error('Erro ao bloquear período');
+    }
+  };
+
+  const createScheduleBlock = async (blockData: {
+    date: string;
+    startTime: string;
+    endTime: string;
+    reason?: string;
+    barberId?: number;
+  }): Promise<boolean> => {
+    try {
+      let finalBarberId = blockData.barberId;
+
+      // Se for barbeiro, forçar o uso do próprio ID
+      if (user?.role === 'barber') {
+        // Buscar o barbeiro correspondente ao usuário logado
+        const { data: barberData, error: barberError } = await supabase
+          .from('barbers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (barberError || !barberData) {
+          toast.error('Erro ao identificar barbeiro');
+          return false;
+        }
+
+        finalBarberId = barberData.id;
+      }
+
+      // Se for admin e não especificou barbeiro, erro
+      if (user?.role === 'admin' && !finalBarberId) {
+        toast.error('Selecione um barbeiro para o bloqueio');
+        return false;
+      }
+
+      const { error } = await supabase
+        .from('schedule_blocks')
+        .insert({
+          barber_id: finalBarberId,
+          block_date: blockData.date,
+          start_time: blockData.startTime,
+          end_time: blockData.endTime,
+          reason: blockData.reason || null,
+          created_by: user?.id || null
+        });
+
+      if (error) throw error;
+
+      toast.success('Período bloqueado com sucesso!');
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao criar bloqueio:', error);
+      toast.error('Erro ao bloquear período');
+      return false;
+    }
+  };
+
+  const deleteAppointment = async (id: string) => {
     try {
       // Primeiro deletar os serviços do agendamento
       const { error: servicesError } = await supabase
@@ -527,9 +624,36 @@ export const useAppointments = () => {
     }
   };
 
-  // Converter agendamentos para eventos do calendário
-  const convertToCalendarEvents = (appointments: Appointment[]): CalendarEvent[] => {
-    return appointments.map(appointment => {
+  // Buscar bloqueios de agenda
+  const loadScheduleBlocks = async (barberId?: number) => {
+    try {
+      let query = supabase
+        .from('schedule_blocks')
+        .select('*')
+        .order('block_date', { ascending: true });
+
+      // Se um barbeiro específico foi selecionado, filtrar bloqueios
+      if (barberId) {
+        query = query.or(`barber_id.eq.${barberId},barber_id.is.null`);
+      }
+
+      const { data: blocks, error } = await query;
+
+      if (error) throw error;
+      return blocks || [];
+    } catch (error) {
+      console.error('Erro ao carregar bloqueios:', error);
+      return [];
+    }
+  };
+
+  // Converter agendamentos e bloqueios para eventos do calendário
+  const convertToCalendarEvents = async (appointments: Appointment[], barberId?: number): Promise<CalendarEvent[]> => {
+    // Buscar bloqueios de agenda
+    const blocks = await loadScheduleBlocks(barberId);
+    
+    // Converter agendamentos
+    const appointmentEvents = appointments.map(appointment => {
       const startTime = new Date(appointment.appointment_datetime);
       
       // Usar duração salva no banco ou calcular baseada no tipo de barbeiro
@@ -572,7 +696,7 @@ export const useAppointments = () => {
       const endTime = new Date(startTime.getTime() + totalDuration * 60000);
 
       const servicesNames = appointment.services?.map(s => s.name) || [];
-      const title = `${appointment.client?.name} - ${servicesNames.join(', ')}`;
+      const title = `${appointment.client?.name || appointment.client_name || 'Cliente'} - ${servicesNames.length > 0 ? servicesNames.join(', ') : appointment.services_names || 'Serviços'}`;
 
       return {
         id: appointment.id,
@@ -581,14 +705,36 @@ export const useAppointments = () => {
         end: endTime,
         resource: {
           status: appointment.status,
-          barber: appointment.barber?.name || '',
-          client: appointment.client?.name || '',
-          services: servicesNames,
+          barber: appointment.barber?.name || appointment.barber_name || '',
+          client: appointment.client?.name || appointment.client_name || '',
+          services: servicesNames.length > 0 ? servicesNames : (appointment.services_names ? appointment.services_names.split(', ') : []),
           total: appointment.total_price,
           appointment
         }
       };
     });
+
+    // Converter bloqueios para eventos do calendário
+    const blockEvents = blocks.map(block => {
+      const blockDate = new Date(block.block_date + 'T' + block.start_time);
+      const blockEndDate = new Date(block.block_date + 'T' + block.end_time);
+      
+      return {
+        id: `block-${block.id}`,
+        title: block.reason || 'Período Bloqueado',
+        start: blockDate,
+        end: blockEndDate,
+        resource: {
+          status: 'blocked',
+          barber: block.barber_id ? 'Barbeiro específico' : 'Todos os barbeiros',
+          isBlock: true,
+          blockData: block
+        }
+      };
+    });
+
+    // Retornar agendamentos e bloqueios juntos
+    return [...appointmentEvents, ...blockEvents];
   };
 
   return {
@@ -604,6 +750,8 @@ export const useAppointments = () => {
     updateAppointmentStatus,
     rescheduleAppointment,
     deleteAppointment,
-    convertToCalendarEvents
+    loadScheduleBlocks,
+    convertToCalendarEvents,
+    createScheduleBlock
   };
 };

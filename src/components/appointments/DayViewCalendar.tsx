@@ -104,11 +104,12 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
   // Função para obter cor do evento baseado no status
   const getEventColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-green-500 border-green-600 text-white';
-      case 'completed': return 'bg-blue-500 border-blue-600 text-white';
+      case 'scheduled': return 'bg-blue-500 border-blue-600 text-white';
+      case 'completed': return 'bg-green-500 border-green-600 text-white';
       case 'cancelled': return 'bg-red-500 border-red-600 text-white';
+      case 'blocked': return 'bg-red-600 border-red-700 text-white';
       case 'no_show': return 'bg-gray-500 border-gray-600 text-white';
-      default: return 'bg-green-500 border-green-600 text-white';
+      default: return 'bg-blue-500 border-blue-600 text-white';
     }
   };
 
@@ -185,9 +186,9 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
                         {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
                       </div>
                       
-                      {/* Cliente - sempre visível */}
+                      {/* Cliente ou Título do Bloqueio - sempre visível */}
                       <div className="text-xs font-semibold truncate mb-0.5 leading-tight">
-                        {event.resource.client}
+                        {event.resource.isBlock ? event.title : event.resource.client}
                       </div>
                       
                       {/* Barbeiro - apenas se houver espaço */}
@@ -197,18 +198,32 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
                         </div>
                       )}
                       
-                      {/* Serviços - apenas se houver mais espaço */}
-                      {parseInt(style.height) > 70 && (
+                      {/* Serviços ou Motivo do Bloqueio - apenas se houver mais espaço */}
+                      {parseInt(style.height) > 70 && !event.resource.isBlock && (
                         <div className="text-xs opacity-80 truncate mb-0.5 leading-tight">
                           {event.resource.services.slice(0, 2).join(', ')}
                           {event.resource.services.length > 2 && '...'}
                         </div>
                       )}
                       
-                      {/* Valor - apenas se houver bastante espaço */}
-                      {parseInt(style.height) > 90 && (
+                      {/* Motivo do Bloqueio - apenas se houver mais espaço */}
+                      {parseInt(style.height) > 70 && event.resource.isBlock && event.resource.blockData?.reason && (
+                        <div className="text-xs opacity-80 truncate mb-0.5 leading-tight">
+                          {event.resource.blockData.reason}
+                        </div>
+                      )}
+                      
+                      {/* Valor - apenas se houver bastante espaço e não for bloqueio */}
+                      {parseInt(style.height) > 90 && !event.resource.isBlock && (
                         <div className="text-xs font-medium opacity-95 leading-tight">
                           {formatCurrency(event.resource.total)}
+                        </div>
+                      )}
+                      
+                      {/* Indicador de Bloqueio - apenas se houver bastante espaço */}
+                      {parseInt(style.height) > 90 && event.resource.isBlock && (
+                        <div className="text-xs font-medium opacity-95 leading-tight">
+                          🚫 Bloqueado
                         </div>
                       )}
                     </div>

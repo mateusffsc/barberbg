@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, RefreshCw, CheckCircle2, History } from 'lucide-react';
+import { Calendar, Plus, RefreshCw, CheckCircle2, History, Lock } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { useClients } from '../hooks/useClients';
 import { useBarbers } from '../hooks/useBarbers';
@@ -10,6 +10,7 @@ import { AppointmentDetailsModal } from '../components/appointments/AppointmentD
 import { AppointmentHistory } from '../components/appointments/AppointmentHistory';
 import { PaymentMethodModal } from '../components/ui/PaymentMethodModal';
 import { ConflictModal } from '../components/appointments/ConflictModal';
+import { BlockScheduleModal } from '../components/appointments/BlockScheduleModal';
 import { CalendarEvent } from '../types/appointment';
 import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,7 +26,8 @@ export const Appointments: React.FC = () => {
     createAppointment,
     updateAppointment,
     updateAppointmentStatus,
-    convertToCalendarEvents
+    convertToCalendarEvents,
+    createScheduleBlock
   } = useAppointments();
 
   const {
@@ -58,6 +60,7 @@ export const Appointments: React.FC = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [appointmentToComplete, setAppointmentToComplete] = useState<CalendarEvent | null>(null);
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar');
+  const [showBlockModal, setShowBlockModal] = useState(false);
   
   // Estados para modal de conflito
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
@@ -70,9 +73,13 @@ export const Appointments: React.FC = () => {
 
   useEffect(() => {
     // Converter agendamentos para eventos do calendário
-    const calendarEvents = convertToCalendarEvents(appointments);
-    setEvents(calendarEvents);
-  }, [appointments]);
+    const convertEvents = async () => {
+      const calendarEvents = await convertToCalendarEvents(appointments, selectedBarberId || undefined);
+      setEvents(calendarEvents);
+    };
+    
+    convertEvents();
+  }, [appointments, selectedBarberId]);
 
   useEffect(() => {
     // Recarregar agendamentos quando o filtro de barbeiro mudar
@@ -129,6 +136,28 @@ export const Appointments: React.FC = () => {
     setConflictModalOpen(false);
     setPendingAppointmentData(null);
     setConflictData(null);
+  };
+
+  // Função para lidar com bloqueio de agenda
+  const handleBlockSchedule = async (blockData: { date: string; start_time: string; end_time: string; reason?: string; barber_id?: number }) => {
+    try {
+      const success = await createScheduleBlock({
+        date: blockData.date,
+        startTime: blockData.start_time,
+        endTime: blockData.end_time,
+        reason: blockData.reason,
+        barberId: blockData.barber_id
+      });
+      
+      if (success) {
+        setShowBlockModal(false);
+        // Recarregar agendamentos para refletir o bloqueio
+        await loadAppointments();
+      }
+    } catch (error) {
+      console.error('Erro ao criar bloqueio:', error);
+      toast.error('Erro ao bloquear período');
+    }
   };
 
   const loadAppointments = async () => {
@@ -350,12 +379,11 @@ export const Appointments: React.FC = () => {
           {activeTab === 'calendar' && (
             <>
               <button
-                onClick={loadAppointments}
-                disabled={isLoading}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setShowBlockModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Atualizar
+                <Lock className="h-4 w-4 mr-2" />
+                Bloquear Agenda
               </button>
 
               {getTodayScheduledCount() > 0 && (
@@ -510,6 +538,12 @@ export const Appointments: React.FC = () => {
         onConfirm={handleConflictConfirm}
         conflictData={conflictData}
         loading={modalLoading}
+      />
+
+      <BlockScheduleModal
+        isOpen={showBlockModal}
+        onClose={() => setShowBlockModal(false)}
+        onBlock={handleBlockSchedule}
       />
     </div>
   );

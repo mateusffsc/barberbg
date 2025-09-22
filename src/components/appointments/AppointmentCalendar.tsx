@@ -80,14 +80,21 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         borderColor: '#dc2626',
         textColor: 'white'
       }, // Vermelho
-      no_show: { 
-        backgroundColor: '#6b7280', 
-        borderColor: '#4b5563',
+      blocked: { 
+        backgroundColor: '#dc2626', 
+        borderColor: '#b91c1c',
         textColor: 'white'
-      }     // Cinza
+      }, // Vermelho escuro para bloqueios
+      'no-show': { 
+        backgroundColor: '#f59e0b', 
+        borderColor: '#d97706',
+        textColor: 'white'
+      } // Amarelo
     };
 
-    const color = colors[event.resource.status] || colors.scheduled;
+    const status = event.resource?.status || 'scheduled';
+    const style = colors[status as keyof typeof colors] || colors.scheduled;
+    const color = style;
 
     return {
       style: {
@@ -390,6 +397,10 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
               <span className="truncate">Cancelado</span>
             </div>
             <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0"></div>
+              <span className="truncate">Bloqueio</span>
+            </div>
+            <div className="flex items-center space-x-1">
               <div className="w-2 h-2 bg-gray-500 rounded-full flex-shrink-0"></div>
               <span className="truncate">Não compareceu</span>
             </div>
@@ -545,7 +556,11 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             <span className="font-medium text-gray-700">Cancelado</span>
           </div>
           <div className="flex items-center space-x-1.5">
-            <div className="w-2.5 h-2.5 bg-gradient-to-r from-gray-500 to-gray-600 rounded-full shadow-sm"></div>
+            <div className="w-2.5 h-2.5 bg-gradient-to-r from-red-600 to-red-700 rounded-full shadow-sm"></div>
+            <span className="font-medium text-gray-700">Bloqueado</span>
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2.5 h-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full shadow-sm"></div>
             <span className="font-medium text-gray-700">Não compareceu</span>
           </div>
         </div>
@@ -594,7 +609,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
                 </div>
                 {!isTablet && (
                   <div className="text-xs opacity-90 truncate leading-tight mt-0.5">
-                    {event.resource.services.join(', ')}
+                    {event.resource.services ? event.resource.services.join(', ') : 
+                     event.resource.isBlock ? (event.resource.blockData?.reason || 'Período Bloqueado') : 
+                     'Sem serviços'}
                   </div>
                 )}
               </div>

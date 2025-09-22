@@ -47,25 +47,103 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   
   // Inicializar dados de edição quando o evento mudar
   useEffect(() => {
-    if (event) {
+    if (event && event.resource && !event.resource.isBlock) {
       const appointmentDate = new Date(event.start);
       setEditData({
-        client_id: event.resource.appointment.client_id || 0,
-        barber_id: event.resource.appointment.barber_id || 0,
-        service_ids: event.resource.appointment.services?.map(s => s.id) || [],
+        client_id: event.resource.appointment?.client_id || 0,
+        barber_id: event.resource.appointment?.barber_id || 0,
+        service_ids: event.resource.appointment?.services?.map(s => s.id) || [],
         appointment_date: appointmentDate.toISOString().split('T')[0],
         appointment_time: appointmentDate.toLocaleTimeString('pt-BR', { 
           hour: '2-digit', 
           minute: '2-digit',
           hour12: false 
         }),
-        custom_duration: event.resource.appointment.duration_minutes?.toString() || '',
-        note: event.resource.appointment.note || ''
+        custom_duration: event.resource.appointment?.duration_minutes?.toString() || '',
+        note: event.resource.appointment?.note || ''
       });
     }
   }, [event]);
   
   if (!isOpen || !event) return null;
+
+  // Se for um evento de bloqueio, mostrar modal específico
+  if (event.resource.isBlock) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">Bloqueio de Agenda</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <span className="text-lg font-medium text-gray-900">Período Bloqueado</span>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">
+                  {event.start.toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">
+                  {event.start.toLocaleTimeString('pt-BR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })} - {event.end.toLocaleTimeString('pt-BR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">
+                  {event.resource.barber}
+                </span>
+              </div>
+              
+              {event.resource.blockData?.reason && (
+                <div className="flex items-start space-x-2">
+                  <FileText className="h-4 w-4 text-gray-500 mt-0.5" />
+                  <span className="text-sm text-gray-600">
+                    {event.resource.blockData.reason}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex justify-end p-6 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
