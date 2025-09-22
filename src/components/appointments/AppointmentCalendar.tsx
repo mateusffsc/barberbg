@@ -7,6 +7,7 @@ import '../../styles/calendar-responsive.css';
 import { CalendarEvent } from '../../types/appointment';
 import { AppointmentContextMenu } from './AppointmentContextMenu';
 import { AppointmentsList } from './AppointmentsList';
+import { DayViewCalendar } from './DayViewCalendar';
 
 // Configurar moment para português brasileiro
 moment.locale('pt-br');
@@ -177,6 +178,125 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
   // Se for mobile ou visualização de semana/dia, mostrar lista em vez de calendário
   if (isMobile || view === Views.WEEK || view === Views.DAY) {
+    // Para visualização do dia no mobile, usar o novo componente de blocos
+    if (view === Views.DAY && isMobile) {
+      return (
+        <div className="h-full flex flex-col">
+          {loading && (
+            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+          )}
+
+          {/* Controles de navegação */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setDate(new Date())}
+                className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+              >
+                Hoje
+              </button>
+              <button
+                onClick={() => setDate(moment(date).subtract(1, 'day').toDate())}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setDate(moment(date).add(1, 'day').toDate())}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setView(Views.MONTH)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${view === Views.MONTH
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+              >
+                Mês
+              </button>
+              <button
+                onClick={() => setView(Views.WEEK)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${view === Views.WEEK
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+              >
+                Semana
+              </button>
+              <button
+                onClick={() => setView(Views.DAY)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${view === Views.DAY
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+              >
+                Dia
+              </button>
+            </div>
+          </div>
+
+          {/* Componente de visualização em blocos para o dia */}
+          <div className="flex-1 overflow-hidden">
+            <DayViewCalendar
+              events={events}
+              date={date}
+              onSelectEvent={onSelectEvent}
+              onSelectSlot={onSelectSlot}
+            />
+          </div>
+
+          {/* Menu de contexto */}
+          <AppointmentContextMenu
+            show={contextMenu.show}
+            x={contextMenu.x}
+            y={contextMenu.y}
+            event={contextMenu.event}
+            onClose={closeContextMenu}
+            onStatusChange={(status) => {
+              if (contextMenu.event) {
+                onStatusChange(contextMenu.event.resource.appointment.id, status);
+              }
+              closeContextMenu();
+            }}
+            onCompleteWithPayment={() => {
+              if (contextMenu.event) {
+                onCompleteWithPayment(contextMenu.event);
+              }
+              closeContextMenu();
+            }}
+            onEdit={() => {
+              if (contextMenu.event) {
+                onSelectEvent(contextMenu.event);
+              }
+              closeContextMenu();
+            }}
+            onDelete={() => {
+              // Implementar exclusão
+              closeContextMenu();
+            }}
+          />
+
+          {/* Overlay para fechar menu de contexto */}
+          {contextMenu.show && (
+            <div
+              className="fixed inset-0 z-40"
+              onClick={closeContextMenu}
+            />
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="h-full flex flex-col">
         {loading && (
