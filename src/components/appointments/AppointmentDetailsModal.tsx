@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Edit3, Save, RotateCcw } from 'lucide-react';
+import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Edit3, Save, RotateCcw, Trash2 } from 'lucide-react';
 import { CalendarEvent } from '../../types/appointment';
 import { PaymentMethod } from '../../types/payment';
 import { PaymentConfirmationModal } from '../ui/PaymentConfirmationModal';
@@ -15,6 +15,7 @@ interface AppointmentDetailsModalProps {
   event: CalendarEvent | null;
   onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => Promise<void>;
   onUpdateAppointment?: (appointmentId: number, updateData: any) => Promise<void>;
+  onDeleteBlock?: (blockId: number) => Promise<void>;
   canChangeStatus?: boolean;
   clients: Client[];
   barbers: Barber[];
@@ -27,6 +28,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   event,
   onStatusChange,
   onUpdateAppointment,
+  onDeleteBlock,
   canChangeStatus = true,
   clients,
   barbers,
@@ -34,6 +36,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
 }) => {
   const [updating, setUpdating] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     client_id: 0,
@@ -64,6 +67,18 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       });
     }
   }, [event]);
+  
+  const handleDeleteBlock = async () => {
+    if (!event?.resource.blockData?.id || !onDeleteBlock) return;
+    
+    try {
+      await onDeleteBlock(event.resource.blockData.id);
+      setShowDeleteConfirmation(false);
+      onClose();
+    } catch (error) {
+      console.error('Erro ao excluir bloqueio:', error);
+    }
+  };
   
   if (!isOpen || !event) return null;
 
@@ -132,7 +147,14 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
             </div>
           </div>
           
-          <div className="flex justify-end p-6 border-t border-gray-200">
+          <div className="flex justify-between p-6 border-t border-gray-200">
+            <button
+              onClick={() => setShowDeleteConfirmation(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center space-x-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Excluir</span>
+            </button>
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -141,6 +163,38 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
             </button>
           </div>
         </div>
+        
+        {/* Modal de Confirmação de Exclusão */}
+        {showDeleteConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
+              <div className="p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <AlertCircle className="h-6 w-6 text-red-500" />
+                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Exclusão</h3>
+                </div>
+                <p className="text-gray-600 mb-6">
+                  Tem certeza que deseja excluir este bloqueio? Esta ação não pode ser desfeita.
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowDeleteConfirmation(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleDeleteBlock}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-600 rounded-md hover:bg-red-700 flex items-center space-x-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Excluir</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

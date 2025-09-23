@@ -8,6 +8,7 @@ import { CalendarEvent } from '../../types/appointment';
 import { AppointmentContextMenu } from './AppointmentContextMenu';
 import { AppointmentsList } from './AppointmentsList';
 import { DayViewCalendar } from './DayViewCalendar';
+import { DayViewDesktop } from './DayViewDesktop';
 
 // Configurar moment para português brasileiro
 moment.locale('pt-br');
@@ -28,6 +29,7 @@ interface AppointmentCalendarProps {
   onStatusChange: (appointmentId: number, newStatus: string) => void;
   onCompleteWithPayment: (event: CalendarEvent) => void;
   loading?: boolean;
+  barbers?: Array<{ id: string; name: string; avatar?: string }>;
 }
 
 export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
@@ -37,9 +39,10 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onEventDrop,
   onStatusChange,
   onCompleteWithPayment,
-  loading = false
+  loading = false,
+  barbers = []
 }) => {
-  const [view, setView] = useState<View>(Views.WEEK);
+  const [view, setView] = useState<View>(Views.DAY);
   const [date, setDate] = useState(new Date());
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
@@ -185,8 +188,8 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
   // Se for mobile ou visualização de semana/dia, mostrar lista em vez de calendário
   if (isMobile || view === Views.WEEK || view === Views.DAY) {
-    // Para visualização do dia no mobile, usar o novo componente de blocos
-    if (view === Views.DAY && isMobile) {
+    // Para visualização do dia, usar componente específico baseado no dispositivo
+    if (view === Views.DAY) {
       return (
         <div className="h-full flex flex-col">
           {loading && (
@@ -252,14 +255,24 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             </div>
           </div>
 
-          {/* Componente de visualização em blocos para o dia */}
+          {/* Componente de visualização para o dia - Desktop ou Mobile */}
           <div className="flex-1 overflow-hidden">
-            <DayViewCalendar
-              events={events}
-              date={date}
-              onSelectEvent={onSelectEvent}
-              onSelectSlot={onSelectSlot}
-            />
+            {isMobile ? (
+              <DayViewCalendar
+                events={events}
+                date={date}
+                onSelectEvent={onSelectEvent}
+                onSelectSlot={onSelectSlot}
+              />
+            ) : (
+              <DayViewDesktop
+                events={events}
+                date={date}
+                onSelectEvent={onSelectEvent}
+                onSelectSlot={onSelectSlot}
+                barbers={barbers}
+              />
+            )}
           </div>
 
           {/* Menu de contexto */}
@@ -593,8 +606,8 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           formats={formats}
           min={minTime}
           max={maxTime}
-          step={30}
-          timeslots={2}
+          step={15}
+          timeslots={4}
           popup
           popupOffset={30}
           components={{

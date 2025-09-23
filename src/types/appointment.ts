@@ -69,10 +69,13 @@ export interface CalendarEvent {
   resource: {
     status: AppointmentStatus;
     barber: string;
+    barberId?: string;
     client: string;
     services: string[];
     total: number;
     appointment: Appointment;
+    isBlock?: boolean;
+    blockData?: any;
   };
 }
 

@@ -180,50 +180,36 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
                     }}
                     onClick={() => onSelectEvent(event)}
                   >
-                    <div className="p-1.5 h-full overflow-hidden">
+                    <div className="p-1 h-full overflow-hidden flex flex-col">
                       {/* Horário - sempre visível */}
-                      <div className="text-xs font-medium opacity-95 mb-0.5 leading-tight">
+                      <div className="text-xs font-medium opacity-95 mb-0.5 leading-tight flex-shrink-0">
                         {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
                       </div>
                       
                       {/* Cliente ou Título do Bloqueio - sempre visível */}
-                      <div className="text-xs font-semibold truncate mb-0.5 leading-tight">
+                      <div className="text-xs font-semibold mb-0.5 leading-tight flex-shrink-0 break-words">
                         {event.resource.isBlock ? event.title : event.resource.client}
                       </div>
                       
+                      {/* Serviços ou Motivo do Bloqueio - sempre visível */}
+                      <div className="text-xs opacity-80 mb-0.5 leading-tight flex-1 break-words overflow-hidden">
+                        {event.resource.isBlock 
+                          ? event.resource.blockData?.reason || 'Bloqueio'
+                          : event.resource.services?.join(', ') || 'Sem serviços'
+                        }
+                      </div>
+                      
                       {/* Barbeiro - apenas se houver espaço */}
-                      {parseInt(style.height) > 50 && (
-                        <div className="text-xs opacity-90 truncate mb-0.5 leading-tight">
+                      {parseInt(style.height) > 60 && (
+                        <div className="text-xs opacity-90 mb-0.5 leading-tight flex-shrink-0">
                           {event.resource.barber}
                         </div>
                       )}
                       
-                      {/* Serviços ou Motivo do Bloqueio - apenas se houver mais espaço */}
-                      {parseInt(style.height) > 70 && !event.resource.isBlock && (
-                        <div className="text-xs opacity-80 truncate mb-0.5 leading-tight">
-                          {event.resource.services.slice(0, 2).join(', ')}
-                          {event.resource.services.length > 2 && '...'}
-                        </div>
-                      )}
-                      
-                      {/* Motivo do Bloqueio - apenas se houver mais espaço */}
-                      {parseInt(style.height) > 70 && event.resource.isBlock && event.resource.blockData?.reason && (
-                        <div className="text-xs opacity-80 truncate mb-0.5 leading-tight">
-                          {event.resource.blockData.reason}
-                        </div>
-                      )}
-                      
                       {/* Valor - apenas se houver bastante espaço e não for bloqueio */}
-                      {parseInt(style.height) > 90 && !event.resource.isBlock && (
-                        <div className="text-xs font-medium opacity-95 leading-tight">
+                      {parseInt(style.height) > 80 && !event.resource.isBlock && (
+                        <div className="text-xs font-medium opacity-95 leading-tight flex-shrink-0 mt-auto">
                           {formatCurrency(event.resource.total)}
-                        </div>
-                      )}
-                      
-                      {/* Indicador de Bloqueio - apenas se houver bastante espaço */}
-                      {parseInt(style.height) > 90 && event.resource.isBlock && (
-                        <div className="text-xs font-medium opacity-95 leading-tight">
-                          🚫 Bloqueado
                         </div>
                       )}
                     </div>

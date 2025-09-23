@@ -27,7 +27,8 @@ export const Appointments: React.FC = () => {
     updateAppointment,
     updateAppointmentStatus,
     convertToCalendarEvents,
-    createScheduleBlock
+    createScheduleBlock,
+    deleteScheduleBlock
   } = useAppointments();
 
   const {
@@ -157,6 +158,19 @@ export const Appointments: React.FC = () => {
     } catch (error) {
       console.error('Erro ao criar bloqueio:', error);
       toast.error('Erro ao bloquear período');
+    }
+  };
+
+  const handleDeleteBlock = async (blockId: number) => {
+    try {
+      const success = await deleteScheduleBlock(blockId);
+      if (success) {
+        // Recarregar agendamentos para refletir a exclusão do bloqueio
+        await loadAppointments();
+      }
+    } catch (error) {
+      console.error('Erro ao excluir bloqueio:', error);
+      toast.error('Erro ao excluir bloqueio');
     }
   };
 
@@ -488,6 +502,7 @@ export const Appointments: React.FC = () => {
               onStatusChange={handleStatusChange}
               onCompleteWithPayment={handleCompleteWithPayment}
               loading={isLoading}
+              barbers={barbers}
             />
           </div>
         </div>
@@ -514,6 +529,7 @@ export const Appointments: React.FC = () => {
         event={selectedEvent}
         onStatusChange={handleStatusChange}
         onUpdateAppointment={updateAppointment}
+        onDeleteBlock={handleDeleteBlock}
         canChangeStatus={true}
         clients={clients}
         barbers={barbers}

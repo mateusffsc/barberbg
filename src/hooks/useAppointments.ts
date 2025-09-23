@@ -635,7 +635,19 @@ export const useAppointments = () => {
       // Se um barbeiro específico foi selecionado, filtrar bloqueios
       if (barberId) {
         query = query.or(`barber_id.eq.${barberId},barber_id.is.null`);
+      } else if (user?.role === 'barber') {
+        // Se for barbeiro sem filtro específico, mostrar apenas seus bloqueios
+        const { data: barberData } = await supabase
+          .from('barbers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (barberData) {
+          query = query.or(`barber_id.eq.${barberData.id},barber_id.is.null`);
+        }
       }
+      // Se for admin sem filtro, mostrar todos os bloqueios (comportamento atual)
 
       const { data: blocks, error } = await query;
 
@@ -698,6 +710,8 @@ export const useAppointments = () => {
       const servicesNames = appointment.services?.map(s => s.name) || [];
       const title = `${appointment.client?.name || appointment.client_name || 'Cliente'} - ${servicesNames.length > 0 ? servicesNames.join(', ') : appointment.services_names || 'Serviços'}`;
 
+      const barberId = appointment.barber_id?.toString() || appointment.barber?.id?.toString() || '';
+
       return {
         id: appointment.id,
         title,
@@ -706,6 +720,7 @@ export const useAppointments = () => {
         resource: {
           status: appointment.status,
           barber: appointment.barber?.name || appointment.barber_name || '',
+          barberId,
           client: appointment.client?.name || appointment.client_name || '',
           services: servicesNames.length > 0 ? servicesNames : (appointment.services_names ? appointment.services_names.split(', ') : []),
           total: appointment.total_price,
@@ -727,6 +742,7 @@ export const useAppointments = () => {
         resource: {
           status: 'blocked',
           barber: block.barber_id ? 'Barbeiro específico' : 'Todos os barbeiros',
+          barberId: block.barber_id?.toString() || '',
           isBlock: true,
           blockData: block
         }
@@ -735,6 +751,24 @@ export const useAppointments = () => {
 
     // Retornar agendamentos e bloqueios juntos
     return [...appointmentEvents, ...blockEvents];
+  };
+
+  const deleteScheduleBlock = async (blockId: number): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('schedule_blocks')
+        .delete()
+        .eq('id', blockId);
+
+      if (error) throw error;
+
+      toast.success('Bloqueio excluído com sucesso!');
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao excluir bloqueio:', error);
+      toast.error('Erro ao excluir bloqueio');
+      return false;
+    }
   };
 
   return {
@@ -752,6 +786,7 @@ export const useAppointments = () => {
     deleteAppointment,
     loadScheduleBlocks,
     convertToCalendarEvents,
-    createScheduleBlock
+    createScheduleBlock,
+    deleteScheduleBlock
   };
 };
