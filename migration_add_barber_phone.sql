@@ -68,87 +68,109 @@ CREATE TRIGGER trigger_sync_barber_phone_update
     FOR EACH ROW
     EXECUTE FUNCTION sync_barber_phone_on_barber_update();
 
--- 7. Atualizar a view appointments_optimized para incluir barber_phone
-CREATE OR REPLACE VIEW appointments_optimized AS
-SELECT 
-    id,
-    client_id,
-    client_name,
-    client_phone,
-    barber_id,
-    barber_name,
-    barber_phone,
-    services_names,
-    services_ids,
-    appointment_datetime,
-    appointment_date,
-    appointment_time,
-    status,
-    total_price,
-    note,
-    payment_method,
-    created_at,
-    updated_at,
-    -- Campos calculados úteis
-    ARRAY_LENGTH(services_ids, 1) as services_count,
-    CASE 
-        WHEN appointment_datetime < NOW() THEN 'past'
-        WHEN appointment_datetime::DATE = CURRENT_DATE THEN 'today'
-        ELSE 'future'
-    END as time_category,
-    -- Formatações úteis
-    client_name || ' (' || client_phone || ')' as client_display,
-    barber_name || ' (' || barber_phone || ')' as barber_display,
-    client_name || ' - ' || services_names as appointment_summary
-FROM appointments;
-
--- 8. Atualizar função get_appointments_optimized para incluir barber_phone
-CREATE OR REPLACE FUNCTION get_appointments_optimized(
-    start_date DATE DEFAULT NULL,
-    end_date DATE DEFAULT NULL,
-    client_name_filter TEXT DEFAULT NULL,
-    client_phone_filter TEXT DEFAULT NULL,
-    barber_name_filter TEXT DEFAULT NULL,
-    barber_phone_filter TEXT DEFAULT NULL,
-    service_name_filter TEXT DEFAULT NULL,
-    status_filter TEXT DEFAULT NULL
-)
-RETURNS TABLE (
-    id INTEGER,
-    client_name TEXT,
-    client_phone TEXT,
-    barber_name TEXT,
-    barber_phone TEXT,
-    services_names TEXT,
-    appointment_datetime TIMESTAMP,
-    status TEXT,
-    total_price DECIMAL
-) AS $$
+-- 7. Verificar se a view appointments_optimized existe e atualizá-la para incluir barber_phone
+DO $$
 BEGIN
-    RETURN QUERY
+    -- Verificar se a view existe
+    IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = 'appointments_optimized') THEN
+        -- Dropar a view existente para recriar com a nova coluna
+        DROP VIEW appointments_optimized;
+    END IF;
+    
+    -- Criar a view com todas as colunas incluindo barber_phone
+    EXECUTE '
+    CREATE VIEW appointments_optimized AS
     SELECT 
-        a.id,
-        a.client_name,
-        a.client_phone,
-        a.barber_name,
-        a.barber_phone,
-        a.services_names,
-        a.appointment_datetime,
-        a.status,
-        a.total_price
-    FROM appointments a
-    WHERE 
-        (start_date IS NULL OR a.appointment_date >= start_date)
-        AND (end_date IS NULL OR a.appointment_date <= end_date)
-        AND (client_name_filter IS NULL OR a.client_name ILIKE '%' || client_name_filter || '%')
-        AND (client_phone_filter IS NULL OR a.client_phone ILIKE '%' || client_phone_filter || '%')
-        AND (barber_name_filter IS NULL OR a.barber_name ILIKE '%' || barber_name_filter || '%')
-        AND (barber_phone_filter IS NULL OR a.barber_phone ILIKE '%' || barber_phone_filter || '%')
-        AND (service_name_filter IS NULL OR a.services_names ILIKE '%' || service_name_filter || '%')
-        AND (status_filter IS NULL OR a.status::TEXT = status_filter)
-    ORDER BY a.appointment_datetime DESC;
-END;
-$$ LANGUAGE plpgsql;
+        id,
+        client_id,
+        client_name,
+        client_phone,
+        barber_id,
+        barber_name,
+        barber_phone,
+        services_names,
+        services_ids,
+        appointment_datetime,
+        appointment_date,
+        appointment_time,
+        status,
+        total_price,
+        note,
+        payment_method,
+        created_at,
+        updated_at,
+        -- Campos calculados úteis
+        ARRAY_LENGTH(services_ids, 1) as services_count,
+        CASE 
+            WHEN appointment_datetime < NOW() THEN ''past''
+            WHEN appointment_datetime::DATE = CURRENT_DATE THEN ''today''
+            ELSE ''future''
+        END as time_category,
+        -- Formatações úteis
+        client_name || '' ('' || client_phone || '')'' as client_display,
+        barber_name || '' ('' || barber_phone || '')'' as barber_display,
+        client_name || '' - '' || services_names as appointment_summary
+    FROM appointments';
+END $$;
+
+-- 8. Verificar se a função get_appointments_optimized existe e atualizá-la para incluir barber_phone
+DO $$
+BEGIN
+    -- Verificar se a função existe
+    IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'get_appointments_optimized') THEN
+        -- Dropar a função existente para recriar com o novo parâmetro
+        DROP FUNCTION get_appointments_optimized;
+    END IF;
+    
+    -- Criar a função com todos os parâmetros incluindo barber_phone_filter
+    EXECUTE '
+    CREATE FUNCTION get_appointments_optimized(
+        start_date DATE DEFAULT NULL,
+        end_date DATE DEFAULT NULL,
+        client_name_filter TEXT DEFAULT NULL,
+        client_phone_filter TEXT DEFAULT NULL,
+        barber_name_filter TEXT DEFAULT NULL,
+        barber_phone_filter TEXT DEFAULT NULL,
+        service_name_filter TEXT DEFAULT NULL,
+        status_filter TEXT DEFAULT NULL
+    )
+    RETURNS TABLE (
+        id INTEGER,
+        client_name TEXT,
+        client_phone TEXT,
+        barber_name TEXT,
+        barber_phone TEXT,
+        services_names TEXT,
+        appointment_datetime TIMESTAMP,
+        status TEXT,
+        total_price DECIMAL
+    ) AS $func$
+    BEGIN
+        RETURN QUERY
+        SELECT 
+            a.id,
+            a.client_name,
+            a.client_phone,
+            a.barber_name,
+            a.barber_phone,
+            a.services_names,
+            a.appointment_datetime,
+            a.status,
+            a.total_price
+        FROM appointments a
+        WHERE 
+            (start_date IS NULL OR a.appointment_date >= start_date)
+            AND (end_date IS NULL OR a.appointment_date <= end_date)
+            AND (client_name_filter IS NULL OR a.client_name ILIKE ''%'' || client_name_filter || ''%'')
+            AND (client_phone_filter IS NULL OR a.client_phone ILIKE ''%'' || client_phone_filter || ''%'')
+            AND (barber_name_filter IS NULL OR a.barber_name ILIKE ''%'' || barber_name_filter || ''%'')
+            AND (barber_phone_filter IS NULL OR a.barber_phone ILIKE ''%'' || barber_phone_filter || ''%'')
+            AND (service_name_filter IS NULL OR a.services_names ILIKE ''%'' || service_name_filter || ''%'')
+            AND (status_filter IS NULL OR a.status::TEXT = status_filter)
+        ORDER BY a.appointment_datetime DESC;
+    END;
+    $func$ LANGUAGE plpgsql';
+END $$;
 
 -- 9. Adicionar comentário para documentação
 COMMENT ON COLUMN appointments.barber_phone IS 'Telefone do barbeiro (sincronizado automaticamente da tabela barbers)';
