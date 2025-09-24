@@ -241,6 +241,7 @@ export const useAppointments = () => {
             client_name: clientData.name,
             client_phone: clientData.phone,
             barber_name: selectedBarber.name,
+            barber_phone: selectedBarber.phone,
             services_names: selectedServices.map(s => s.name).join(', '),
             services_ids: selectedServices.map(s => s.id),
             appointment_datetime: toLocalISOString(date),

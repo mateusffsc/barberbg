@@ -9,6 +9,7 @@ export interface Appointment {
   client_phone: string; // Telefone do cliente (sincronizado automaticamente)
   barber_id: number;
   barber_name: string; // Nome do barbeiro (sincronizado automaticamente)
+  barber_phone: string; // Telefone do barbeiro (sincronizado automaticamente)
   services_names: string; // Nomes dos serviços separados por vírgula
   services_ids: number[]; // Array com IDs dos serviços
   appointment_datetime: string; // Data e hora combinadas (principal)
@@ -33,6 +34,7 @@ export interface Appointment {
   barber?: {
     id: number;
     name: string;
+    phone?: string;
   };
   services?: Array<{
     id: number;
