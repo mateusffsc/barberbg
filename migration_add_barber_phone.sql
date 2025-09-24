@@ -62,11 +62,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 6. Criar trigger para sincronizar quando telefone do barbeiro mudar
-CREATE TRIGGER trigger_sync_barber_phone_update
-    AFTER UPDATE OF phone ON barbers
-    FOR EACH ROW
-    EXECUTE FUNCTION sync_barber_phone_on_barber_update();
+-- 6. Criar trigger para sincronizar quando telefone do barbeiro mudar (verificar se já existe)
+DO $$
+BEGIN
+    -- Verificar se o trigger já existe
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_sync_barber_phone_update') THEN
+        -- Criar o trigger apenas se não existir
+        EXECUTE '
+        CREATE TRIGGER trigger_sync_barber_phone_update
+            AFTER UPDATE OF phone ON barbers
+            FOR EACH ROW
+            EXECUTE FUNCTION sync_barber_phone_on_barber_update()';
+    END IF;
+END $$;
 
 -- 7. Verificar se a view appointments_optimized existe e atualizá-la para incluir barber_phone
 DO $$
