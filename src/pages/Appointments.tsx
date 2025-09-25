@@ -638,6 +638,39 @@ export const Appointments: React.FC = () => {
       {/* Layout Mobile/Tablet (<1024px) - layout original */}
       <div className="lg:hidden">
         <div className="p-4 space-y-4">
+          {/* Botões de Ação Mobile */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Ações</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={handleNewAppointment}
+                className="inline-flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo
+              </button>
+
+              <button
+                onClick={() => setShowBlockModal(true)}
+                className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors"
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                Bloquear
+              </button>
+
+              {getTodayScheduledCount() > 0 && (
+                <button
+                  onClick={handleCompleteAllToday}
+                  disabled={completingAll || isLoading}
+                  className="col-span-2 inline-flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
+                  Concluir Todos ({getTodayScheduledCount()})
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Filtro de Barbeiro Mobile (apenas para admin) */}
           {user?.role === 'admin' && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
