@@ -7,6 +7,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Unauthorized } from './pages/Unauthorized';
 import { Clients } from './pages/Clients';
+import { ClientRegistration } from './pages/ClientRegistration';
 import { Services } from './pages/Services';
 import { Products } from './pages/Products';
 import { Barbers } from './pages/Barbers';
@@ -23,6 +24,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/cadastrodeclientes" element={<ClientRegistration />} />
           
           <Route path="/" element={
             <ProtectedRoute>
