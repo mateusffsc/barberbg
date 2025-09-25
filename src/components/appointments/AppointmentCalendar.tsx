@@ -30,6 +30,7 @@ interface AppointmentCalendarProps {
   onCompleteWithPayment: (event: CalendarEvent) => void;
   loading?: boolean;
   barbers?: Array<{ id: string; name: string; avatar?: string }>;
+  selectedDate?: Date;
 }
 
 export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
@@ -40,7 +41,8 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onStatusChange,
   onCompleteWithPayment,
   loading = false,
-  barbers = []
+  barbers = [],
+  selectedDate
 }) => {
   const [view, setView] = useState<View>(Views.DAY);
   const [date, setDate] = useState(new Date());
@@ -64,6 +66,13 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Sincronizar data interna com selectedDate
+  React.useEffect(() => {
+    if (selectedDate) {
+      setDate(selectedDate);
+    }
+  }, [selectedDate]);
 
   // Configuração de cores por status
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
@@ -554,26 +563,26 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
       </div>
 
       {/* Legenda de cores */}
-      <div className="mb-1 bg-gray-50 rounded-lg p-2">
-        <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 text-xs">
-          <div className="flex items-center space-x-1.5">
-            <div className="w-2.5 h-2.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-sm"></div>
+      <div className="mb-1 bg-gray-50 rounded-lg p-1.5">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 md:gap-2 text-xs">
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-sm"></div>
             <span className="font-medium text-gray-700">Agendado</span>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <div className="w-2.5 h-2.5 bg-gradient-to-r from-green-500 to-green-600 rounded-full shadow-sm"></div>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-green-600 rounded-full shadow-sm"></div>
             <span className="font-medium text-gray-700">Concluído</span>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <div className="w-2.5 h-2.5 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm"></div>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm"></div>
             <span className="font-medium text-gray-700">Cancelado</span>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <div className="w-2.5 h-2.5 bg-gradient-to-r from-red-600 to-red-700 rounded-full shadow-sm"></div>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-gradient-to-r from-red-600 to-red-700 rounded-full shadow-sm"></div>
             <span className="font-medium text-gray-700">Bloqueado</span>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <div className="w-2.5 h-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full shadow-sm"></div>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full shadow-sm"></div>
             <span className="font-medium text-gray-700">Não compareceu</span>
           </div>
         </div>
@@ -582,8 +591,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
       <div
         className="flex-1 min-h-0"
         style={{
-          height: isTablet ? 'calc(100vh - 200px)' : 'calc(100vh - 160px)',
-          minHeight: '600px'
+          height: isTablet ? 'calc(100vh - 220px)' : 'calc(100vh - 200px)',
+          minHeight: isTablet ? '350px' : '400px',
+          maxHeight: isTablet ? 'calc(100vh - 220px)' : 'calc(100vh - 200px)'
         }}
       >
         <Calendar

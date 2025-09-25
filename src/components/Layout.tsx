@@ -13,7 +13,9 @@ import {
   X,
   LogOut,
   ChevronDown,
-  Receipt
+  Receipt,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from './Logo';
@@ -41,6 +43,7 @@ const menuItems: MenuItem[] = [
 
 export const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
@@ -59,6 +62,10 @@ export const Layout: React.FC = () => {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
@@ -71,12 +78,19 @@ export const Layout: React.FC = () => {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+        className={`fixed inset-y-0 left-0 z-50 bg-gray-900 text-white transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'} w-64`}
       >
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-800">
-          <Logo size="lg" textClassName="text-white" />
+        <div className={`flex items-center h-16 px-6 border-b border-gray-800 ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : 'justify-between'}`}>
+          {!sidebarCollapsed && <Logo size="lg" textClassName="text-white" />}
+          {sidebarCollapsed && (
+            <div className="hidden lg:block">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Scissors className="h-5 w-5 text-white" />
+              </div>
+            </div>
+          )}
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-gray-400 hover:text-white"
@@ -85,28 +99,55 @@ export const Layout: React.FC = () => {
           </button>
         </div>
 
+        {/* Toggle button for desktop */}
+        <div className="hidden lg:block absolute -right-3 top-20 z-60">
+          <button
+            onClick={toggleSidebar}
+            className="bg-gray-900 border-2 border-gray-700 text-white rounded-full p-1 hover:bg-gray-800 transition-colors shadow-lg"
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+
         <nav className="mt-8">
-          <div className="px-4 space-y-2">
+          <div className={`px-4 space-y-2 ${sidebarCollapsed ? 'lg:px-2' : ''}`}>
             {filteredMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               
               return (
-                <button
-                  key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    setSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-gray-800 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  }`}
-                >
-                  <Icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </button>
+                <div key={item.path} className="relative group">
+                  <button
+                    onClick={() => {
+                      navigate(item.path);
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center text-sm font-medium rounded-lg transition-colors ${
+                      sidebarCollapsed ? 'lg:justify-center lg:px-3 lg:py-3' : 'px-4 py-3'
+                    } ${
+                      isActive
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 ${sidebarCollapsed ? '' : 'mr-3'}`} />
+                    {!sidebarCollapsed && (
+                      <span className="lg:block">{item.name}</span>
+                    )}
+                  </button>
+                  
+                  {/* Tooltip for collapsed state */}
+                  {sidebarCollapsed && (
+                    <div className="hidden lg:group-hover:block absolute left-full top-0 ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg shadow-lg whitespace-nowrap z-50">
+                      {item.name}
+                      <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-800 rotate-45"></div>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

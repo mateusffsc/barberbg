@@ -35,13 +35,9 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
 
-  console.log('BlockScheduleModal - barbers:', barbers);
-  console.log('BlockScheduleModal - user:', user);
-
   // Carregar barbeiros quando o modal abrir
   useEffect(() => {
     if (isOpen) {
-      console.log('Modal aberto, carregando barbeiros...');
       loadBarbers();
     }
   }, [isOpen]);
@@ -49,9 +45,7 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
   // Definir barbeiro automaticamente para usuários barbeiros
   useEffect(() => {
     if (isOpen && user?.role === 'barber' && barbers.length > 0) {
-      console.log('Definindo barbeiro automaticamente para usuário barbeiro');
       const currentBarber = barbers.find(barber => barber.user_id === user.id);
-      console.log('Barbeiro encontrado:', currentBarber);
       if (currentBarber) {
         setBlockData(prev => ({
           ...prev,
@@ -63,13 +57,10 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
 
   const loadBarbers = async () => {
     try {
-      console.log('Chamando fetchBarbers...');
       const result = await fetchBarbers(1, '', 1000);
-      console.log('Resultado fetchBarbers:', result);
       
       // Atualizar o estado local com os barbeiros carregados
       if (result.barbers && result.barbers.length > 0) {
-        console.log('Barbeiros carregados:', result.barbers);
         setBarbers(result.barbers);
       }
     } catch (error) {

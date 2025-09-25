@@ -95,10 +95,8 @@ export const useAppointments = () => {
       if (formData.custom_duration && formData.custom_duration > 0) {
         // Usar duração customizada
         totalDuration = formData.custom_duration;
-        console.log(`⏱️ Usando duração customizada: ${totalDuration} minutos`);
       } else {
         // Calcular duração total baseada no tipo de barbeiro
-        console.log('🔍 Calculando duração baseada no tipo de barbeiro...');
         
         // Buscar informações do barbeiro
         const { data: barberData, error: barberError } = await supabase
@@ -113,33 +111,23 @@ export const useAppointments = () => {
           totalDuration = selectedServices.reduce((sum, service) => sum + (service.duration_minutes_normal || 30), 0);
         } else {
           const isSpecialBarber = barberData?.is_special_barber || false;
-          console.log(`👨‍💼 Barbeiro especial: ${isSpecialBarber ? 'SIM' : 'NÃO'}`);
           
           // Calcular duração para cada serviço
           for (const service of selectedServices) {
             let serviceDuration;
             
-            console.log(`🔍 Analisando serviço "${service.name}":`, {
-              duration_minutes_normal: service.duration_minutes_normal,
-              duration_minutes_special: service.duration_minutes_special
-            });
-            
             if (isSpecialBarber) {
               // Barbeiro especial usa duration_minutes_special
               serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
-              console.log(`⏱️ Serviço "${service.name}": ${serviceDuration} min (especial)`);
             } else {
               // Barbeiro normal usa duration_minutes_normal
               serviceDuration = service.duration_minutes_normal || 30;
-              console.log(`⏱️ Serviço "${service.name}": ${serviceDuration} min (normal)`);
             }
             
             totalDuration += serviceDuration;
           }
         }
       }
-      
-      console.log(`⏱️ Duração total calculada: ${totalDuration} minutos`);
       
       // Gerar datas dos agendamentos baseado na recorrência
       // Usar função que não converte timezone
@@ -675,29 +663,19 @@ export const useAppointments = () => {
       if (appointment.duration_minutes && appointment.duration_minutes > 0) {
         // Usar duração salva no banco (customizada ou padrão)
         totalDuration = appointment.duration_minutes;
-        console.log(`⏱️ Usando duração do banco: ${totalDuration} minutos`);
       } else if (appointment.services && appointment.services.length > 0) {
         // Fallback: calcular duração baseada no tipo de barbeiro
         const isSpecialBarber = appointment.barber?.is_special_barber || false;
         
-        console.log(`🔍 Convertendo para calendário - Barbeiro especial: ${isSpecialBarber ? 'SIM' : 'NÃO'}`);
-        
         totalDuration = appointment.services.reduce((sum, service) => {
           let serviceDuration;
-          
-          console.log(`🔍 Serviço "${service.name}":`, {
-            duration_minutes_normal: service.duration_minutes_normal,
-            duration_minutes_special: service.duration_minutes_special
-          });
           
           if (isSpecialBarber) {
             // Barbeiro especial usa duration_minutes_special
             serviceDuration = service.duration_minutes_special || service.duration_minutes_normal || 30;
-            console.log(`⏱️ Usando ${serviceDuration} min (especial)`);
           } else {
             // Barbeiro normal usa duration_minutes_normal
             serviceDuration = service.duration_minutes_normal || 30;
-            console.log(`⏱️ Usando ${serviceDuration} min (normal)`);
           }
           
           return sum + serviceDuration;

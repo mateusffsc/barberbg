@@ -35,15 +35,15 @@
 
 .rbc-header {
   flex: 1;
-  padding: 18px 12px;
+  padding: 8px 6px;
   text-align: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 11px;
   color: white;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
   background: transparent;
   text-transform: none;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .rbc-header:last-child {
@@ -61,7 +61,8 @@
 .rbc-month-row {
   flex: 1;
   display: flex;
-  min-height: 120px;
+  min-height: calc((100vh - 300px) / 6);
+  max-height: calc((100vh - 300px) / 6);
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -72,7 +73,7 @@
 /* Células dos dias */
 .rbc-date-cell {
   flex: 1;
-  padding: 12px 8px;
+  padding: 6px 4px;
   border-right: 1px solid #f1f5f9;
   position: relative;
   overflow: hidden;
@@ -95,8 +96,8 @@
   font-weight: 600;
   color: #1f2937;
   text-decoration: none;
-  font-size: 15px;
-  margin-bottom: 6px;
+  font-size: 12px;
+  margin-bottom: 3px;
   flex-shrink: 0;
   display: inline-block;
   width: 24px;
@@ -155,14 +156,14 @@
 .rbc-month-view .rbc-event {
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
   border: none !important;
-  border-radius: 6px;
-  padding: 4px 8px;
-  margin: 2px 0;
-  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 1px 0;
+  font-size: 9px;
   font-weight: 600;
   color: white !important;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -171,6 +172,7 @@
   box-sizing: border-box;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  line-height: 1.2;
 }
 
 .rbc-month-view .rbc-event::before {
@@ -235,24 +237,24 @@
 
 .rbc-time-header-content {
   display: flex;
-  margin-left: 80px; /* Espaço para coluna de horários */
+  margin-left: 60px; /* Espaço para coluna de horários */
   position: relative;
 }
 
 .rbc-time-header .rbc-header {
   flex: 1;
-  padding: 20px 12px;
+  padding: 8px 6px;
   text-align: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 11px;
   color: white;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
   border-left: none;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60px;
+  min-height: 40px;
   text-transform: none;
 }
 
@@ -274,7 +276,7 @@
 
 /* Coluna de horários */
 .rbc-time-gutter {
-  width: 80px !important;
+  width: 60px !important;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border-right: 1px solid #e2e8f0;
   flex-shrink: 0;
@@ -283,13 +285,13 @@
 }
 
 .rbc-time-gutter .rbc-time-slot {
-  font-size: 11px;
+  font-size: 9px;
   color: #64748b;
   text-align: right;
-  padding-right: 12px;
+  padding-right: 6px;
   font-weight: 600;
   border-bottom: 1px solid #f1f5f9;
-  height: 20px;
+  height: 15px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -301,6 +303,7 @@
   border-right: 1px solid #e5e7eb;
   position: relative;
   min-width: 0; /* Permite flexbox shrink */
+  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura */
 }
 
 .rbc-day-slot:last-child {
@@ -315,6 +318,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura */
 }
 
 /* Alinhamento correto das colunas */
@@ -325,6 +329,7 @@
 /* Garantir que as colunas dos dias se alinhem perfeitamente */
 .rbc-time-content .rbc-day-slot {
   border-right: 1px solid #e5e7eb;
+  box-sizing: border-box;
 }
 
 .rbc-time-content .rbc-day-slot:last-child {
@@ -335,6 +340,8 @@
 .rbc-time-header .rbc-header {
   box-sizing: border-box;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
+  flex: 1;
+  min-width: 0;
 }
 
 .rbc-time-header .rbc-header:last-child {
@@ -344,11 +351,13 @@
 /* Slots de tempo */
 .rbc-time-slot {
   border-bottom: 1px solid #f1f5f9;
-  min-height: 20px;
+  min-height: 10px;
+  height: auto;
 }
 
 .rbc-timeslot-group {
-  min-height: 80px;
+  min-height: 40px;
+  height: auto;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -356,17 +365,18 @@
 .rbc-time-view .rbc-event {
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
   border: none !important;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 9px;
   font-weight: 600;
   color: white !important;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
-  margin: 2px 3px;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.25);
+  margin: 1px 2px;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  line-height: 1.2;
 }
 
 .rbc-time-view .rbc-event::before {
@@ -441,11 +451,48 @@
   background: #94a3b8;
 }
 
-/* Garantir altura total */
+/* Garantir altura total e responsividade */
 .rbc-calendar,
 .rbc-month-view,
 .rbc-time-view {
   height: 100% !important;
+  overflow: hidden;
+}
+
+.rbc-time-content {
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* Responsividade para telas menores */
+@media (max-height: 700px) {
+  .rbc-month-row {
+    min-height: calc((100vh - 350px) / 6);
+    max-height: calc((100vh - 350px) / 6);
+  }
+  
+  .rbc-timeslot-group {
+    min-height: 45px;
+  }
+  
+  .rbc-time-slot {
+    min-height: 12px;
+  }
+}
+
+@media (max-height: 600px) {
+  .rbc-month-row {
+    min-height: calc((100vh - 300px) / 6);
+    max-height: calc((100vh - 300px) / 6);
+  }
+  
+  .rbc-timeslot-group {
+    min-height: 35px;
+  }
+  
+  .rbc-time-slot {
+    min-height: 10px;
+  }
 }
 
 /* Responsividade básica */

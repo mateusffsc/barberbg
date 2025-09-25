@@ -34,7 +34,7 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
   // Filtrar barbeiros baseado no tipo de usuário
   const filteredBarbers = user?.role === 'barber' 
     ? barbers.filter(barber => barber.id === user.barber?.id?.toString())
-    : barbers;
+    : barbers.slice(0, 9); // Limitar a apenas 9 barbeiros
 
   // Agrupar eventos por barbeiro
   const eventsByBarber = filteredBarbers.reduce((acc, barber) => {
@@ -130,8 +130,8 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
       <div className="flex-1 overflow-auto">
         <div className="flex min-h-full">
           {/* Coluna de horários */}
-          <div className="w-20 flex-shrink-0 border-r border-gray-200 bg-gray-50">
-            <div className="h-20 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 flex items-center justify-center">
+          <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50">
+            <div className="h-16 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 flex items-center justify-center">
               <span className="text-xs font-semibold text-gray-700">Horário</span>
             </div>
             {hoursRange.map(hour => (
@@ -148,23 +148,23 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
           {/* Colunas dos barbeiros */}
           <div className="flex-1 flex">
             {filteredBarbers.map((barber, index) => (
-              <div key={barber.id} className="min-w-[200px] flex-1 border-r border-gray-200 last:border-r-0">
+              <div key={barber.id} className="min-w-[114px] flex-1 border-r border-gray-200 last:border-r-0" style={{boxSizing: 'border-box'}}>
                 {/* Header do barbeiro */}
-                <div className="h-20 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 flex flex-col items-center justify-center p-2">
+                <div className="h-16 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 flex flex-col items-center justify-center p-1">
                   {barber.avatar ? (
                     <img 
                       src={barber.avatar} 
                       alt={barber.name}
-                      className="w-8 h-8 rounded-full object-cover mb-1"
+                      className="w-6 h-6 rounded-full object-cover mb-0.5"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mb-1">
-                      <span className="text-white text-sm font-bold">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mb-0.5">
+                      <span className="text-white text-xs font-bold">
                         {barber.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
-                  <span className="text-xs font-medium text-gray-900 text-center truncate w-full">
+                  <span className="text-xs font-medium text-gray-900 text-center truncate w-full leading-tight">
                     {barber.name}
                   </span>
                 </div>

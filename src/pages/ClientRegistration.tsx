@@ -89,8 +89,6 @@ export const ClientRegistration: React.FC = () => {
         .eq('phone', formData.phone)
         .single();
 
-      console.log('🔍 Resultado da verificação:', { existingClient, checkError });
-
       if (checkError && checkError.code !== 'PGRST116') {
         console.log('❌ Erro na verificação:', checkError);
         throw checkError;

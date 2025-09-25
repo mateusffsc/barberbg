@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, RefreshCw, CheckCircle2, History, Lock } from 'lucide-react';
+import { Calendar, Plus, RefreshCw, CheckCircle2, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { useClients } from '../hooks/useClients';
 import { useBarbers } from '../hooks/useBarbers';
@@ -7,7 +7,6 @@ import { useServices } from '../hooks/useServices';
 import { AppointmentCalendar } from '../components/appointments/AppointmentCalendar';
 import { AppointmentModal } from '../components/appointments/AppointmentModal';
 import { AppointmentDetailsModal } from '../components/appointments/AppointmentDetailsModal';
-import { AppointmentHistory } from '../components/appointments/AppointmentHistory';
 import { PaymentMethodModal } from '../components/ui/PaymentMethodModal';
 import { ConflictModal } from '../components/appointments/ConflictModal';
 import { BlockScheduleModal } from '../components/appointments/BlockScheduleModal';
@@ -60,13 +59,82 @@ export const Appointments: React.FC = () => {
   const [selectedBarberId, setSelectedBarberId] = useState<number | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [appointmentToComplete, setAppointmentToComplete] = useState<CalendarEvent | null>(null);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar');
   const [showBlockModal, setShowBlockModal] = useState(false);
   
   // Estados para modal de conflito
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
   const [conflictData, setConflictData] = useState<any>(null);
   const [pendingAppointmentData, setPendingAppointmentData] = useState<any>(null);
+
+  // Estados para o calendário mensal
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
+
+  // Funções para o calendário mensal
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
+    
+    // Adicionar dias do mês anterior
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+      const prevDate = new Date(year, month, -i);
+      days.push({ date: prevDate, isCurrentMonth: false });
+    }
+    
+    // Adicionar dias do mês atual
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      days.push({ date, isCurrentMonth: true });
+    }
+    
+    // Adicionar dias do próximo mês para completar a grade
+    const remainingDays = 42 - days.length; // 6 semanas * 7 dias
+    for (let day = 1; day <= remainingDays; day++) {
+      const nextDate = new Date(year, month + 1, day);
+      days.push({ date: nextDate, isCurrentMonth: false });
+    }
+    
+    return days;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      if (direction === 'prev') {
+        newMonth.setMonth(prev.getMonth() - 1);
+      } else {
+        newMonth.setMonth(prev.getMonth() + 1);
+      }
+      return newMonth;
+    });
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.toDateString() === date2.toDateString();
+  };
+
+  const hasAppointments = (date: Date) => {
+    return appointments.some(apt => {
+      const aptDate = new Date(apt.appointment_datetime);
+      return isSameDay(aptDate, date);
+    });
+  };
+
+  const handleCalendarDateClick = (date: Date) => {
+    setSelectedCalendarDate(date);
+    setSelectedDate(date);
+  };
 
   useEffect(() => {
     loadInitialData();
@@ -99,121 +167,54 @@ export const Appointments: React.FC = () => {
         loadServices()
       ]);
     } catch (error) {
-      console.error('Erro ao carregar dados iniciais:', error);
+      console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
-  // Funções para modal de conflito
-  const handleConflictConfirm = async () => {
-    if (!pendingAppointmentData) return;
-    
-    setModalLoading(true);
-    try {
-      const { formData, selectedServices, selectedBarber, recurrence } = pendingAppointmentData;
-      
-      // Criar agendamento com allowOverlap = true
-      const appointment = await createAppointment(formData, selectedServices, selectedBarber, recurrence, true);
-      
-      if (appointment) {
-        await loadAppointments();
-        setIsModalOpen(false);
-        setConflictModalOpen(false);
-        toast.success('Agendamento criado com encaixe!');
-      }
-    } catch (error) {
-      console.error('Erro ao criar agendamento com encaixe:', error);
-      toast.error('Erro ao criar agendamento com encaixe');
-    } finally {
-      setModalLoading(false);
-      setPendingAppointmentData(null);
-      setConflictData(null);
-    }
-  };
-
-  const handleConflictCancel = () => {
-    setConflictModalOpen(false);
-    setPendingAppointmentData(null);
-    setConflictData(null);
-  };
-
-  // Função para lidar com bloqueio de agenda
-  const handleBlockSchedule = async (blockData: { date: string; start_time: string; end_time: string; reason?: string; barber_id?: number }) => {
-    try {
-      const success = await createScheduleBlock({
-        date: blockData.date,
-        startTime: blockData.start_time,
-        endTime: blockData.end_time,
-        reason: blockData.reason,
-        barberId: blockData.barber_id
-      });
-      
-      if (success) {
-        setShowBlockModal(false);
-        // Recarregar agendamentos para refletir o bloqueio
-        await loadAppointments();
-      }
-    } catch (error) {
-      console.error('Erro ao criar bloqueio:', error);
-      toast.error('Erro ao bloquear período');
-    }
-  };
-
-  const handleDeleteBlock = async (blockId: number) => {
-    try {
-      const success = await deleteScheduleBlock(blockId);
-      if (success) {
-        // Recarregar agendamentos para refletir a exclusão do bloqueio
-        await loadAppointments();
-      }
-    } catch (error) {
-      console.error('Erro ao excluir bloqueio:', error);
-      toast.error('Erro ao excluir bloqueio');
-    }
-  };
-
   const loadAppointments = async () => {
     try {
-      // Remover limitação de 30 dias - buscar todos os agendamentos
-      // Passar o barbeiro selecionado para o filtro (apenas para admin)
-      const barberId = user?.role === 'admin' ? selectedBarberId : undefined;
-      const result = await fetchAppointments(undefined, undefined, barberId || undefined);
-      setAppointments(result.appointments);
+      const response = await fetchAppointments(undefined, undefined, selectedBarberId || undefined);
+      setAppointments(response.appointments);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
+      toast.error('Erro ao carregar agendamentos');
     }
   };
 
   const loadClients = async () => {
     try {
-      const result = await fetchClients(1, '', 1000);
-      setClients(result.clients);
+      const response = await fetchClients(1, '', 1000); // Buscar todos os clientes
+      setClients(response.clients);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
   const loadBarbers = async () => {
     try {
-      const result = await fetchBarbers(1, '', 1000);
-      setBarbers(result.barbers);
+      const response = await fetchBarbers(1, '', 1000); // Buscar todos os barbeiros
+      setBarbers(response.barbers);
     } catch (error) {
       console.error('Erro ao carregar barbeiros:', error);
+      toast.error('Erro ao carregar barbeiros');
     }
   };
 
   const loadServices = async () => {
     try {
-      const result = await fetchServices(1, '', 1000);
-      setServices(result.services);
+      const response = await fetchServices(1, '', 1000); // Buscar todos os serviços
+      setServices(response.services);
     } catch (error) {
       console.error('Erro ao carregar serviços:', error);
+      toast.error('Erro ao carregar serviços');
     }
   };
 
-  const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
+  const handleSelectSlot = (slotInfo: any) => {
     setSelectedDate(slotInfo.start);
     setIsModalOpen(true);
   };
@@ -223,48 +224,33 @@ export const Appointments: React.FC = () => {
     setIsDetailsModalOpen(true);
   };
 
-  const handleEventDrop = async (event: CalendarEvent, start: Date, end: Date) => {
-    // Implementar reagendamento por drag & drop
-    console.log('Reagendar:', event, start, end);
-  };
-
   const handleNewAppointment = () => {
     setSelectedDate(undefined);
     setIsModalOpen(true);
   };
 
-  const handleModalSubmit = async (formData: any, selectedServices: any[], selectedBarber: any, recurrence?: any) => {
+  const handleModalSubmit = async (appointmentData: any, selectedServices: any[], selectedBarber: any, recurrence?: any) => {
     setModalLoading(true);
     try {
-      const appointment = await createAppointment(formData, selectedServices, selectedBarber, recurrence);
-      if (appointment) {
-        await loadAppointments();
+      // Verificar conflitos antes de criar
+      const conflictCheck = await checkForConflicts(appointmentData);
+      
+      if (conflictCheck.hasConflict) {
+        setConflictData(conflictCheck);
+        setPendingAppointmentData(appointmentData);
+        setConflictModalOpen(true);
         setIsModalOpen(false);
-        toast.success('Agendamento criado com sucesso!');
+        return;
       }
+
+      await createAppointment(appointmentData, selectedServices, selectedBarber, recurrence);
+      await loadAppointments();
+      setIsModalOpen(false);
+      toast.success('Agendamento criado com sucesso!');
     } catch (error: any) {
       console.error('Erro ao criar agendamento:', error);
-      
-      // Verificar se é um erro de conflito
-      if (error.message && error.message.includes('conflitos encontrados')) {
-        // Extrair dados dos conflitos do erro
-        const conflictInfo = error.conflicts || [];
-        setConflictData({
-          newAppointment: {
-            client: selectedServices[0] ? `Cliente ID: ${formData.client_id}` : 'Cliente não identificado',
-            barber: selectedBarber.name,
-            datetime: formData.appointment_datetime,
-            services: selectedServices.map(s => s.name).join(', '),
-            duration: formData.custom_duration || selectedServices.reduce((total, service) => total + (service.duration || 30), 0)
-          },
-          conflicts: conflictInfo
-        });
-        
-        // Salvar dados do agendamento pendente
-        setPendingAppointmentData({ formData, selectedServices, selectedBarber, recurrence });
-        
-        // Abrir modal de conflito
-        setConflictModalOpen(true);
+      if (error.message?.includes('conflito')) {
+        toast.error(error.message);
       } else {
         toast.error('Erro ao criar agendamento');
       }
@@ -273,20 +259,112 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => {
+  const checkForConflicts = async (appointmentData: any) => {
     try {
-      const success = await updateAppointmentStatus(appointmentId, newStatus, paymentMethod, finalAmount);
-      if (success) {
+      // Validar se appointment_datetime existe e é válido
+      if (!appointmentData.appointment_datetime) {
+        console.error('appointment_datetime não fornecido');
+        return { hasConflict: false };
+      }
+
+      const appointmentStart = new Date(appointmentData.appointment_datetime);
+      
+      // Verificar se a data é válida
+      if (isNaN(appointmentStart.getTime())) {
+        console.error('Data inválida:', appointmentData.appointment_datetime);
+        return { hasConflict: false };
+      }
+
+      // Verificar se duration_minutes existe
+      const durationMinutes = appointmentData.duration_minutes || 60; // Default 60 minutos
+      const appointmentEnd = new Date(appointmentStart.getTime() + (durationMinutes * 60000));
+
+      // Buscar agendamentos do mesmo barbeiro no mesmo período
+      const { data: existingAppointments, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('barber_id', appointmentData.barber_id)
+        .eq('status', 'scheduled')
+        .gte('appointment_datetime', appointmentStart.toISOString())
+        .lt('appointment_datetime', appointmentEnd.toISOString());
+
+      if (error) throw error;
+
+      if (existingAppointments && existingAppointments.length > 0) {
+        return {
+          hasConflict: true,
+          conflictingAppointments: existingAppointments,
+          newAppointment: appointmentData
+        };
+      }
+
+      return { hasConflict: false };
+    } catch (error) {
+      console.error('Erro ao verificar conflitos:', error);
+      return { hasConflict: false };
+    }
+  };
+
+  const handleConflictConfirm = async () => {
+    if (!pendingAppointmentData) return;
+
+    setModalLoading(true);
+    try {
+      await createAppointment(pendingAppointmentData);
+      await loadAppointments();
+      setConflictModalOpen(false);
+      setPendingAppointmentData(null);
+      setConflictData(null);
+      toast.success('Agendamento criado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      toast.error('Erro ao criar agendamento');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleConflictCancel = () => {
+    setConflictModalOpen(false);
+    setPendingAppointmentData(null);
+    setConflictData(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEventDrop = async (info: any) => {
+    try {
+      const event = info.event;
+      const newStart = info.event.start;
+      
+      if (event.extendedProps.type === 'appointment') {
+        await updateAppointment(event.extendedProps.appointment.id, {
+          appointment_datetime: newStart.toISOString()
+        });
         await loadAppointments();
-        // Atualizar o evento selecionado se for o mesmo
-        if (selectedEvent?.resource.appointment.id === appointmentId) {
-          setSelectedEvent(null);
-          setIsDetailsModalOpen(false);
-        }
+        toast.success('Agendamento reagendado com sucesso!');
       }
     } catch (error) {
-      console.error('Erro ao alterar status:', error);
-      throw error;
+      console.error('Erro ao reagendar:', error);
+      toast.error('Erro ao reagendar agendamento');
+      info.revert();
+    }
+  };
+
+  const handleStatusChange = async (appointmentId: number, status: string, paymentMethod?: PaymentMethod) => {
+    try {
+      await updateAppointmentStatus(appointmentId, status, paymentMethod);
+      await loadAppointments();
+      
+      if (status === 'completed') {
+        toast.success('Agendamento finalizado com sucesso!');
+      } else if (status === 'cancelled') {
+        toast.success('Agendamento cancelado');
+      } else {
+        toast.success('Status atualizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast.error('Erro ao atualizar status do agendamento');
     }
   };
 
@@ -298,6 +376,7 @@ export const Appointments: React.FC = () => {
   const handlePaymentSelection = async (paymentMethod: PaymentMethod) => {
     if (!appointmentToComplete) return;
 
+    setModalLoading(true);
     try {
       await handleStatusChange(appointmentToComplete.resource.appointment.id, 'completed', paymentMethod);
       toast.success('Agendamento finalizado com sucesso!');
@@ -368,147 +447,251 @@ export const Appointments: React.FC = () => {
     }).length;
   };
 
+  const handleBlockSchedule = async (blockData: any) => {
+    try {
+      await createScheduleBlock(blockData);
+      await loadAppointments();
+      setShowBlockModal(false);
+      toast.success('Horário bloqueado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao bloquear horário:', error);
+      toast.error('Erro ao bloquear horário');
+    }
+  };
+
+  const handleDeleteBlock = async (blockId: number) => {
+    try {
+      await deleteScheduleBlock(blockId);
+      await loadAppointments();
+      setIsDetailsModalOpen(false);
+      toast.success('Bloqueio removido com sucesso!');
+    } catch (error) {
+      console.error('Erro ao remover bloqueio:', error);
+      toast.error('Erro ao remover bloqueio');
+    }
+  };
+
   const isLoading = loading;
 
   return (
-    <div className="h-full flex flex-col space-y-2" style={{ minHeight: '100vh', paddingBottom: '1rem' }}>
+    <div className="h-full" style={{ minHeight: '100vh', paddingBottom: '1rem' }}>
       <Toaster position="top-right" />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            <Calendar className="h-6 w-6 mr-2" />
-            {user?.role === 'admin' ? 'Agendamentos' : 'Meus Agendamentos'}
-          </h1>
-          <p className="text-gray-600">
-            {user?.role === 'admin'
-              ? 'Gerencie todos os agendamentos da barbearia'
-              : 'Seus agendamentos e horários'
-            }
-          </p>
-        </div>
+      {/* Layout Desktop (≥1024px) - com sidebar */}
+      <div className="hidden lg:flex lg:space-x-4">
+        {/* Sidebar esquerda com calendário mensal e botões */}
+        <div className="w-56 flex-shrink-0 space-y-2">
+          {/* Calendário Mensal */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-gray-900">
+                {currentMonth.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+              </h2>
+              <div className="flex space-x-0.5">
+                <button
+                  onClick={() => navigateMonth('prev')}
+                  className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <ChevronLeft className="h-3 w-3 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => navigateMonth('next')}
+                  className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <ChevronRight className="h-3 w-3 text-gray-600" />
+                </button>
+              </div>
+            </div>
 
-        <div className="flex items-center space-x-3">
-          {activeTab === 'calendar' && (
+            {/* Cabeçalho dos dias da semana */}
+            <div className="grid grid-cols-7 gap-0.5 mb-1">
+              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, index) => (
+                <div key={index} className="text-center text-xs font-medium text-gray-500 py-0.5">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Grade do calendário */}
+            <div className="grid grid-cols-7 gap-0.5">
+              {getDaysInMonth(currentMonth).map((dayInfo, index) => {
+                const { date, isCurrentMonth } = dayInfo;
+                const isSelected = isSameDay(date, selectedCalendarDate);
+                const isCurrentDay = isToday(date);
+                const hasApts = hasAppointments(date);
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleCalendarDateClick(date)}
+                    className={`
+                      relative p-1 text-xs rounded transition-all duration-200 hover:bg-gray-100 h-6 w-6
+                      ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-900'}
+                      ${isSelected ? 'bg-blue-500 text-white hover:bg-blue-600' : ''}
+                      ${isCurrentDay && !isSelected ? 'bg-blue-50 text-blue-600 font-semibold' : ''}
+                    `}
+                  >
+                    {date.getDate()}
+                    {hasApts && (
+                      <div className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0.5 h-0.5 rounded-full ${
+                        isSelected ? 'bg-white' : 'bg-blue-500'
+                      }`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Botões de Ação */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 space-y-1.5">
+            <h3 className="text-xs font-semibold text-gray-900 mb-1">Ações</h3>
+            
+            <button
+              onClick={handleNewAppointment}
+              className="w-full inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-gray-900 transition-colors"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Novo
+            </button>
+
             <>
               <button
                 onClick={() => setShowBlockModal(true)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
+                className="w-full inline-flex items-center justify-center px-2 py-1.5 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-gray-900 transition-colors"
               >
-                <Lock className="h-4 w-4 mr-2" />
-                Bloquear Agenda
+                <Lock className="h-3 w-3 mr-1" />
+                Bloquear
               </button>
 
               {getTodayScheduledCount() > 0 && (
                 <button
                   onClick={handleCompleteAllToday}
                   disabled={completingAll || isLoading}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
-                  Concluir Todos Hoje ({getTodayScheduledCount()})
+                  <CheckCircle2 className={`h-3 w-3 mr-1 ${completingAll ? 'animate-spin' : ''}`} />
+                  Concluir ({getTodayScheduledCount()})
                 </button>
               )}
-
-              <button
-                onClick={handleNewAppointment}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Agendamento
-              </button>
             </>
+          </div>
+
+          {/* Filtro de Barbeiro (apenas para admin) */}
+          {user?.role === 'admin' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2">
+              <h3 className="text-xs font-semibold text-gray-900 mb-1">Filtros</h3>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">
+                  Barbeiro:
+                </label>
+                <select
+                  value={selectedBarberId || ''}
+                  onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-full px-2 py-1 border border-gray-300 rounded bg-white text-xs focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">Todos</option>
+                  {barbers.map((barber) => (
+                    <option key={barber.id} value={barber.id}>
+                      {barber.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedBarberId && (
+                  <button
+                    onClick={() => setSelectedBarberId(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700 underline"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <nav className="flex space-x-8 px-6" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab('calendar')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'calendar'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
-              <span>Agenda</span>
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'history'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <History className="h-4 w-4" />
-              <span>Histórico</span>
-            </div>
-          </button>
-        </nav>
-      </div>
+        {/* Conteúdo principal - Desktop */}
+        <div className="flex-1 flex flex-col space-y-3 min-w-0">
+          {/* Content */}
+          <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-2 min-h-0 relative overflow-hidden" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)' }}>
+            {/* Decorative background */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-50 to-blue-50 rounded-full translate-y-12 -translate-x-12 opacity-50"></div>
 
-      {/* Filtro de Barbeiro (apenas para admin e tab agenda) */}
-      {user?.role === 'admin' && activeTab === 'calendar' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2">
-          <div className="flex items-center space-x-3">
-            <label className="text-sm font-medium text-gray-700">
-              Filtrar por barbeiro:
-            </label>
-            <select
-              value={selectedBarberId || ''}
-              onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            >
-              <option value="">Todos os barbeiros</option>
-              {barbers.map((barber) => (
-                <option key={barber.id} value={barber.id}>
-                  {barber.name}
-                </option>
-              ))}
-            </select>
-            {selectedBarberId && (
-              <button
-                onClick={() => setSelectedBarberId(null)}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
-              >
-                Limpar filtro
-              </button>
-            )}
+            <div className="relative z-10 h-full">
+              <AppointmentCalendar
+                events={events}
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={handleSelectEvent}
+                onEventDrop={handleEventDrop}
+                onStatusChange={handleStatusChange}
+                onCompleteWithPayment={handleCompleteWithPayment}
+                loading={isLoading}
+                barbers={barbers}
+                selectedDate={selectedCalendarDate}
+              />
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Content */}
-      {activeTab === 'calendar' ? (
-        <div className="flex-1 bg-white rounded-xl shadow-lg border border-gray-100 p-4 min-h-0 relative overflow-hidden" style={{ minHeight: '700px', height: 'calc(100vh - 120px)' }}>
-          {/* Decorative background */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-50 to-blue-50 rounded-full translate-y-12 -translate-x-12 opacity-50"></div>
+      {/* Layout Mobile/Tablet (<1024px) - layout original */}
+      <div className="lg:hidden">
+        <div className="p-4 space-y-4">
+          {/* Filtro de Barbeiro Mobile (apenas para admin) */}
+          {user?.role === 'admin' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Filtros</h3>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Barbeiro:
+                </label>
+                <select
+                  value={selectedBarberId || ''}
+                  onChange={(e) => setSelectedBarberId(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">Todos os barbeiros</option>
+                  {barbers.map((barber) => (
+                    <option key={barber.id} value={barber.id}>
+                      {barber.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedBarberId && (
+                  <button
+                    onClick={() => setSelectedBarberId(null)}
+                    className="text-sm text-gray-500 hover:text-gray-700 underline"
+                  >
+                    Limpar filtro
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
-          <div className="relative z-10 h-full">
-            <AppointmentCalendar
-              events={events}
-              onSelectSlot={handleSelectSlot}
-              onSelectEvent={handleSelectEvent}
-              onEventDrop={handleEventDrop}
-              onStatusChange={handleStatusChange}
-              onCompleteWithPayment={handleCompleteWithPayment}
-              loading={isLoading}
-              barbers={barbers}
-            />
+          {/* Content Mobile */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 min-h-0 relative overflow-hidden" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)' }}>
+            {/* Decorative background */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-50 to-blue-50 rounded-full translate-y-12 -translate-x-12 opacity-50"></div>
+
+            <div className="relative z-10 h-full">
+              <AppointmentCalendar
+                events={events}
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={handleSelectEvent}
+                onEventDrop={handleEventDrop}
+                onStatusChange={handleStatusChange}
+                onCompleteWithPayment={handleCompleteWithPayment}
+                loading={isLoading}
+                barbers={barbers}
+                selectedDate={selectedCalendarDate}
+              />
+            </div>
           </div>
         </div>
-      ) : (
-        <AppointmentHistory className="flex-1" />
-      )}
+      </div>
 
       {/* Modals */}
       <AppointmentModal
