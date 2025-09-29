@@ -305,13 +305,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       return;
     }
     
-    // Validar se a data não é no passado
-    const selectedDateTime = new Date(`${editData.appointment_date}T${editData.appointment_time}`);
-    const now = new Date();
-    if (selectedDateTime < now) {
-      toast.error('Não é possível agendar para uma data/hora no passado');
-      return;
-    }
+    // Validação de data passada removida - permitindo edição para horários passados
     
     // Validar duração personalizada se fornecida
     if (editData.custom_duration && (parseInt(editData.custom_duration) < 5 || parseInt(editData.custom_duration) > 480)) {

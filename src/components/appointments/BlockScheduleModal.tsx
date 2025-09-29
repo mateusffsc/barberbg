@@ -90,7 +90,16 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
 
     setLoading(true);
     try {
-      await onBlock(blockData);
+      // Converter os dados para o formato esperado pela função createScheduleBlock
+      const blockDataFormatted = {
+        date: blockData.date,
+        startTime: blockData.start_time,
+        endTime: blockData.end_time,
+        reason: blockData.reason,
+        barberId: blockData.barber_id
+      };
+      
+      await onBlock(blockDataFormatted);
       toast.success('Período bloqueado com sucesso!');
       onClose();
       // Reset form
