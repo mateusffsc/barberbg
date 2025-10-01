@@ -65,6 +65,9 @@ export const Appointments: React.FC = () => {
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
   const [conflictData, setConflictData] = useState<any>(null);
   const [pendingAppointmentData, setPendingAppointmentData] = useState<any>(null);
+  const [pendingSelectedServices, setPendingSelectedServices] = useState<any[]>([]);
+  const [pendingSelectedBarber, setPendingSelectedBarber] = useState<any>(null);
+  const [pendingRecurrence, setPendingRecurrence] = useState<any>(null);
 
   // Estados para o calendário mensal
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -238,6 +241,9 @@ export const Appointments: React.FC = () => {
       if (conflictCheck.hasConflict) {
         setConflictData(conflictCheck);
         setPendingAppointmentData(appointmentData);
+        setPendingSelectedServices(selectedServices);
+        setPendingSelectedBarber(selectedBarber);
+        setPendingRecurrence(recurrence);
         setConflictModalOpen(true);
         setIsModalOpen(false);
         return;
@@ -291,10 +297,41 @@ export const Appointments: React.FC = () => {
       if (error) throw error;
 
       if (existingAppointments && existingAppointments.length > 0) {
+        // Buscar dados do cliente e barbeiro para o novo agendamento
+        const [clientData, barberData] = await Promise.all([
+          supabase
+            .from('clients')
+            .select('name')
+            .eq('id', appointmentData.client_id)
+            .single(),
+          supabase
+            .from('barbers')
+            .select('name')
+            .eq('id', appointmentData.barber_id)
+            .single()
+        ]);
+
+        // Buscar nomes dos serviços
+        let servicesNames = '';
+        if (appointmentData.service_ids && appointmentData.service_ids.length > 0) {
+          const { data: servicesData } = await supabase
+            .from('services')
+            .select('name')
+            .in('id', appointmentData.service_ids);
+          
+          servicesNames = servicesData?.map(s => s.name).join(', ') || '';
+        }
+
         return {
           hasConflict: true,
           conflictingAppointments: existingAppointments,
-          newAppointment: appointmentData
+          newAppointment: {
+            ...appointmentData,
+            client_name: clientData.data?.name || 'Cliente não informado',
+            barber_name: barberData.data?.name || 'Barbeiro não informado',
+            services_names: servicesNames,
+            duration_minutes: durationMinutes
+          }
         };
       }
 
@@ -310,10 +347,19 @@ export const Appointments: React.FC = () => {
 
     setModalLoading(true);
     try {
-      await createAppointment(pendingAppointmentData);
+      await createAppointment(
+        pendingAppointmentData, 
+        pendingSelectedServices, 
+        pendingSelectedBarber, 
+        pendingRecurrence,
+        true // allowOverlap = true para permitir sobreposição
+      );
       await loadAppointments();
       setConflictModalOpen(false);
       setPendingAppointmentData(null);
+      setPendingSelectedServices([]);
+      setPendingSelectedBarber(null);
+      setPendingRecurrence(null);
       setConflictData(null);
       toast.success('Agendamento criado com sucesso!');
     } catch (error) {
@@ -327,6 +373,9 @@ export const Appointments: React.FC = () => {
   const handleConflictCancel = () => {
     setConflictModalOpen(false);
     setPendingAppointmentData(null);
+    setPendingSelectedServices([]);
+    setPendingSelectedBarber(null);
+    setPendingRecurrence(null);
     setConflictData(null);
     setIsModalOpen(true);
   };

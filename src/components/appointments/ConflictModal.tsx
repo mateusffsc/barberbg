@@ -11,34 +11,44 @@ interface ConflictInfo {
   }>;
 }
 
+import { formatTimeFromISO } from '../../utils/dateHelpers';
+
 interface ConflictModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  conflicts: ConflictInfo[];
-  newAppointmentData: {
-    client_name: string;
-    barber_name: string;
-    services_names: string;
-    appointment_datetime: string;
-    duration_minutes: number;
-  };
+  conflictData: {
+    hasConflict: boolean;
+    conflictingAppointments: Array<{
+      id: number;
+      appointment_datetime: string;
+      client_name: string;
+      barber_name: string;
+      service_names: string;
+      duration_minutes: number;
+    }>;
+    newAppointment: {
+      appointment_datetime: string;
+      client_name: string;
+      barber_name: string;
+      service_names: string;
+      duration_minutes: number;
+    };
+  } | null;
+  loading?: boolean;
 }
 
 export const ConflictModal: React.FC<ConflictModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  conflicts,
-  newAppointmentData
+  conflictData,
+  loading = false
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen || !conflictData || !conflictData.hasConflict) return null;
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatTimeFromISO(dateString);
   };
 
   const formatDate = (date: Date) => {
@@ -86,21 +96,21 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium text-blue-800">Cliente:</span>
-                <span className="ml-2 text-blue-700">{newAppointmentData.client_name}</span>
+                <span className="ml-2 text-blue-700">{conflictData.newAppointment.client_name || 'Cliente não informado'}</span>
               </div>
               <div>
                 <span className="font-medium text-blue-800">Barbeiro:</span>
-                <span className="ml-2 text-blue-700">{newAppointmentData.barber_name}</span>
+                <span className="ml-2 text-blue-700">{conflictData.newAppointment.barber_name || 'Barbeiro não informado'}</span>
               </div>
               <div>
                 <span className="font-medium text-blue-800">Serviços:</span>
-                <span className="ml-2 text-blue-700">{newAppointmentData.services_names}</span>
+                <span className="ml-2 text-blue-700">{conflictData.newAppointment.services_names || 'Serviços não informados'}</span>
               </div>
               <div>
                 <span className="font-medium text-blue-800">Horário:</span>
                 <span className="ml-2 text-blue-700">
-                  {formatTime(newAppointmentData.appointment_datetime)} 
-                  ({newAppointmentData.duration_minutes} min)
+                  {formatTime(conflictData.newAppointment.appointment_datetime)} 
+                  ({conflictData.newAppointment.duration_minutes || 60} min)
                 </span>
               </div>
             </div>
@@ -113,36 +123,30 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
               Agendamentos em Conflito
             </h3>
             
-            {conflicts.map((conflictGroup, groupIndex) => (
-              <div key={groupIndex} className="space-y-3">
-                <h4 className="font-medium text-gray-800 capitalize">
-                  {formatDate(conflictGroup.date)}
-                </h4>
-                
-                {conflictGroup.conflicts.map((conflict, index) => (
-                  <div key={conflict.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-red-800">Cliente:</span>
-                        <span className="ml-2 text-red-700">{conflict.client_name}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-red-800">Horário:</span>
-                        <span className="ml-2 text-red-700">
-                          {formatTime(conflict.appointment_datetime)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-red-800">Duração:</span>
-                        <span className="ml-2 text-red-700">
-                          {conflict.duration_minutes || 30} min
-                        </span>
-                      </div>
+            <div className="space-y-3">
+              {conflictData.conflictingAppointments.map((conflict, index) => (
+                <div key={conflict.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <span className="font-medium text-red-800">Cliente:</span>
+                      <span className="ml-2 text-red-700">{conflict.client_name || 'Cliente não informado'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-red-800">Horário:</span>
+                      <span className="ml-2 text-red-700">
+                        {formatTime(conflict.appointment_datetime)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-red-800">Duração:</span>
+                      <span className="ml-2 text-red-700">
+                        {conflict.duration_minutes || 30} min
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Aviso */}
@@ -165,15 +169,17 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors disabled:opacity-50"
           >
-            Confirmar Encaixe
+            {loading ? 'Confirmando...' : 'Confirmar Encaixe'}
           </button>
         </div>
       </div>
