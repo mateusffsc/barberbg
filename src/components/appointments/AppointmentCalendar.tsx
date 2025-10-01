@@ -28,6 +28,7 @@ interface AppointmentCalendarProps {
   onEventDrop: (event: CalendarEvent, start: Date, end: Date) => void;
   onStatusChange: (appointmentId: number, newStatus: string) => void;
   onCompleteWithPayment: (event: CalendarEvent) => void;
+  onDeleteAppointment?: (appointmentId: number) => void;
   loading?: boolean;
   barbers?: Array<{ id: string; name: string; avatar?: string }>;
   selectedDate?: Date;
@@ -40,6 +41,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onEventDrop,
   onStatusChange,
   onCompleteWithPayment,
+  onDeleteAppointment,
   loading = false,
   barbers = [],
   selectedDate
@@ -310,7 +312,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
               closeContextMenu();
             }}
             onDelete={() => {
-              // Implementar exclusão
+              if (contextMenu.event && onDeleteAppointment) {
+                onDeleteAppointment(contextMenu.event.resource.appointment.id);
+              }
               closeContextMenu();
             }}
           />
@@ -465,7 +469,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             closeContextMenu();
           }}
           onDelete={() => {
-            // Implementar exclusão
+            if (contextMenu.event && onDeleteAppointment) {
+              onDeleteAppointment(contextMenu.event.resource.appointment.id);
+            }
             closeContextMenu();
           }}
         />
@@ -669,7 +675,9 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           closeContextMenu();
         }}
         onDelete={() => {
-          // Implementar exclusão
+          if (contextMenu.event && onDeleteAppointment) {
+            onDeleteAppointment(contextMenu.event.resource.appointment.id);
+          }
           closeContextMenu();
         }}
       />

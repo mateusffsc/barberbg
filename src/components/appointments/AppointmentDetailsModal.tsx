@@ -16,6 +16,7 @@ interface AppointmentDetailsModalProps {
   onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => Promise<void>;
   onUpdateAppointment?: (appointmentId: number, updateData: any) => Promise<void>;
   onDeleteBlock?: (blockId: number) => Promise<void>;
+  onDeleteAppointment?: (appointmentId: number) => Promise<void>;
   canChangeStatus?: boolean;
   clients: Client[];
   barbers: Barber[];
@@ -29,6 +30,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   onStatusChange,
   onUpdateAppointment,
   onDeleteBlock,
+  onDeleteAppointment,
   canChangeStatus = true,
   clients,
   barbers,
@@ -77,6 +79,20 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       onClose();
     } catch (error) {
       console.error('Erro ao excluir bloqueio:', error);
+    }
+  };
+
+  const handleDeleteAppointment = async () => {
+    if (!event?.resource.appointment?.id || !onDeleteAppointment) return;
+    
+    try {
+      await onDeleteAppointment(event.resource.appointment.id);
+      setShowDeleteConfirmation(false);
+      onClose();
+      toast.success('Agendamento excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir agendamento:', error);
+      toast.error('Erro ao excluir agendamento');
     }
   };
   
@@ -164,37 +180,6 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
           </div>
         </div>
         
-        {/* Modal de Confirmação de Exclusão */}
-        {showDeleteConfirmation && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
-              <div className="p-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <AlertCircle className="h-6 w-6 text-red-500" />
-                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Exclusão</h3>
-                </div>
-                <p className="text-gray-600 mb-6">
-                  Tem certeza que deseja excluir este bloqueio? Esta ação não pode ser desfeita.
-                </p>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => setShowDeleteConfirmation(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleDeleteBlock}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-600 rounded-md hover:bg-red-700 flex items-center space-x-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span>Excluir</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -375,6 +360,15 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                     title="Editar agendamento"
                   >
                     <Edit3 size={18} />
+                  </button>
+                )}
+                {!isEditing && onDeleteAppointment && (
+                  <button
+                    onClick={() => setShowDeleteConfirmation(true)}
+                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Excluir agendamento"
+                  >
+                    <Trash2 size={18} />
                   </button>
                 )}
                 <button
@@ -717,6 +711,41 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         originalAmount={event.resource.total}
         loading={updating}
       />
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+                <h3 className="text-lg font-semibold text-gray-900">Confirmar Exclusão</h3>
+              </div>
+              <p className="text-gray-600 mb-6">
+                {event.resource.isBlock 
+                  ? 'Tem certeza que deseja excluir este bloqueio? Esta ação não pode ser desfeita.'
+                  : 'Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.'
+                }
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteConfirmation(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={event.resource.isBlock ? handleDeleteBlock : handleDeleteAppointment}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-600 rounded-md hover:bg-red-700 flex items-center space-x-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Excluir</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

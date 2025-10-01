@@ -25,6 +25,7 @@ export const Appointments: React.FC = () => {
     createAppointment,
     updateAppointment,
     updateAppointmentStatus,
+    deleteAppointment,
     convertToCalendarEvents,
     createScheduleBlock,
     deleteScheduleBlock
@@ -520,6 +521,19 @@ export const Appointments: React.FC = () => {
     }
   };
 
+  const handleDeleteAppointment = async (appointmentId: number) => {
+    try {
+      const success = await deleteAppointment(appointmentId.toString());
+      if (success) {
+        await loadAppointments();
+        toast.success('Agendamento excluído com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir agendamento:', error);
+      toast.error('Erro ao excluir agendamento');
+    }
+  };
+
   const isLoading = loading;
 
   return (
@@ -675,6 +689,7 @@ export const Appointments: React.FC = () => {
                 onEventDrop={handleEventDrop}
                 onStatusChange={handleStatusChange}
                 onCompleteWithPayment={handleCompleteWithPayment}
+                onDeleteAppointment={handleDeleteAppointment}
                 loading={isLoading}
                 barbers={barbers}
                 selectedDate={selectedCalendarDate}
@@ -766,6 +781,7 @@ export const Appointments: React.FC = () => {
                 onEventDrop={handleEventDrop}
                 onStatusChange={handleStatusChange}
                 onCompleteWithPayment={handleCompleteWithPayment}
+                onDeleteAppointment={handleDeleteAppointment}
                 loading={isLoading}
                 barbers={barbers}
                 selectedDate={selectedCalendarDate}
@@ -795,6 +811,7 @@ export const Appointments: React.FC = () => {
         onStatusChange={handleStatusChange}
         onUpdateAppointment={updateAppointment}
         onDeleteBlock={handleDeleteBlock}
+        onDeleteAppointment={handleDeleteAppointment}
         canChangeStatus={true}
         clients={clients}
         barbers={barbers}
