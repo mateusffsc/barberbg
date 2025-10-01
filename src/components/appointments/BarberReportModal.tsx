@@ -263,11 +263,18 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
       
       // Adicionar agendamentos
       formattedAppointments.forEach(apt => {
+        // Calcular fator de desconto baseado no final_amount
+        const originalTotal = apt.total_price;
+        const finalTotal = apt.final_amount || apt.total_price;
+        const discountFactor = originalTotal > 0 ? finalTotal / originalTotal : 1;
+        
         const serviceCommissions = apt.services.reduce((sum, service) => {
           const rate = service.is_chemical 
             ? barberData.commission_rate_chemical_service 
             : barberData.commission_rate_service;
-          return sum + (service.price * rate);
+          // Aplicar o fator de desconto na comissão
+          const adjustedCommission = service.price * rate * discountFactor;
+          return sum + adjustedCommission;
         }, 0);
         
         transactions.push({

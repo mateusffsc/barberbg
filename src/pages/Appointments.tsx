@@ -26,6 +26,8 @@ export const Appointments: React.FC = () => {
     updateAppointment,
     updateAppointmentStatus,
     deleteAppointment,
+    deleteRecurringAppointments,
+    updateRecurringAppointments,
     convertToCalendarEvents,
     createScheduleBlock,
     deleteScheduleBlock
@@ -286,18 +288,35 @@ export const Appointments: React.FC = () => {
       const durationMinutes = appointmentData.duration_minutes || 60; // Default 60 minutos
       const appointmentEnd = new Date(appointmentStart.getTime() + (durationMinutes * 60000));
 
-      // Buscar agendamentos do mesmo barbeiro no mesmo período
-      const { data: existingAppointments, error } = await supabase
+      // Buscar todos os agendamentos do mesmo barbeiro no mesmo dia
+      const dayStart = new Date(appointmentStart);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(appointmentStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const { data: allAppointments, error } = await supabase
         .from('appointments')
-        .select('*')
+        .select('id, appointment_datetime, duration_minutes, client_name, service_names')
         .eq('barber_id', appointmentData.barber_id)
         .eq('status', 'scheduled')
-        .gte('appointment_datetime', appointmentStart.toISOString())
-        .lt('appointment_datetime', appointmentEnd.toISOString());
+        .gte('appointment_datetime', dayStart.toISOString())
+        .lte('appointment_datetime', dayEnd.toISOString());
 
       if (error) throw error;
 
-      if (existingAppointments && existingAppointments.length > 0) {
+      // Filtrar agendamentos que realmente se sobrepõem
+      const conflictingAppointments = allAppointments?.filter(existing => {
+        const existingStart = new Date(existing.appointment_datetime);
+        const existingDuration = existing.duration_minutes || 30;
+        const existingEnd = new Date(existingStart.getTime() + (existingDuration * 60000));
+
+        // Verificar se há sobreposição real entre os períodos
+        return (
+          (appointmentStart < existingEnd && appointmentEnd > existingStart)
+        );
+      }) || [];
+
+      if (conflictingAppointments && conflictingAppointments.length > 0) {
         // Buscar dados do cliente e barbeiro para o novo agendamento
         const [clientData, barberData] = await Promise.all([
           supabase
@@ -325,7 +344,7 @@ export const Appointments: React.FC = () => {
 
         return {
           hasConflict: true,
-          conflictingAppointments: existingAppointments,
+          conflictingAppointments: conflictingAppointments,
           newAppointment: {
             ...appointmentData,
             client_name: clientData.data?.name || 'Cliente não informado',
@@ -400,9 +419,9 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (appointmentId: number, status: string, paymentMethod?: PaymentMethod) => {
+  const handleStatusChange = async (appointmentId: number, status: string, paymentMethod?: PaymentMethod, finalAmount?: number) => {
     try {
-      await updateAppointmentStatus(appointmentId, status, paymentMethod);
+      await updateAppointmentStatus(appointmentId, status, paymentMethod, finalAmount);
       await loadAppointments();
       
       if (status === 'completed') {
@@ -812,6 +831,8 @@ export const Appointments: React.FC = () => {
         onUpdateAppointment={updateAppointment}
         onDeleteBlock={handleDeleteBlock}
         onDeleteAppointment={handleDeleteAppointment}
+        onDeleteRecurringAppointments={deleteRecurringAppointments}
+        onUpdateRecurringAppointments={updateRecurringAppointments}
         canChangeStatus={true}
         clients={clients}
         barbers={barbers}

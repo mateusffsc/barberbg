@@ -23,6 +23,7 @@ export interface Appointment {
   duration_minutes_special?: number;
   note?: string; // Observações do agendamento
   payment_method?: PaymentMethod;
+  recurrence_group_id?: string; // UUID que agrupa agendamentos recorrentes
   created_at: string;
   updated_at: string;
   // Relacionamentos (opcionais para compatibilidade)

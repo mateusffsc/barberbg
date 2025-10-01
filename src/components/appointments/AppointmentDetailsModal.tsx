@@ -8,6 +8,7 @@ import { Client } from '../../types/client';
 import { Barber } from '../../types/barber';
 import { Service } from '../../types/service';
 import toast from 'react-hot-toast';
+import RecurrenceActionModal from './RecurrenceActionModal';
 
 interface AppointmentDetailsModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ interface AppointmentDetailsModalProps {
   onUpdateAppointment?: (appointmentId: number, updateData: any) => Promise<void>;
   onDeleteBlock?: (blockId: number) => Promise<void>;
   onDeleteAppointment?: (appointmentId: number) => Promise<void>;
+  onDeleteRecurringAppointments?: (recurrenceGroupId: string) => Promise<void>;
+  onUpdateRecurringAppointments?: (recurrenceGroupId: string, updateData: any) => Promise<void>;
   canChangeStatus?: boolean;
   clients: Client[];
   barbers: Barber[];
@@ -31,6 +34,8 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   onUpdateAppointment,
   onDeleteBlock,
   onDeleteAppointment,
+  onDeleteRecurringAppointments,
+  onUpdateRecurringAppointments,
   canChangeStatus = true,
   clients,
   barbers,
@@ -39,6 +44,8 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   const [updating, setUpdating] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
+  const [recurrenceAction, setRecurrenceAction] = useState<'edit' | 'delete'>('delete');
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     client_id: 0,
@@ -85,6 +92,14 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   const handleDeleteAppointment = async () => {
     if (!event?.resource.appointment?.id || !onDeleteAppointment) return;
     
+    // Verificar se é um agendamento recorrente
+    if (event.resource.appointment.recurrence_group_id) {
+      setRecurrenceAction('delete');
+      setShowRecurrenceModal(true);
+      setShowDeleteConfirmation(false);
+      return;
+    }
+    
     try {
       await onDeleteAppointment(event.resource.appointment.id);
       setShowDeleteConfirmation(false);
@@ -93,6 +108,60 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     } catch (error) {
       console.error('Erro ao excluir agendamento:', error);
       toast.error('Erro ao excluir agendamento');
+    }
+  };
+
+  const handleRecurrenceAction = async (action: 'single' | 'all') => {
+    if (!event?.resource.appointment) return;
+
+    try {
+      if (recurrenceAction === 'delete') {
+        if (action === 'single') {
+          // Excluir apenas este agendamento
+          if (onDeleteAppointment) {
+            await onDeleteAppointment(event.resource.appointment.id);
+            toast.success('Agendamento excluído com sucesso!');
+          }
+        } else {
+          // Excluir toda a série recorrente
+          if (onDeleteRecurringAppointments && event.resource.appointment.recurrence_group_id) {
+            await onDeleteRecurringAppointments(event.resource.appointment.recurrence_group_id);
+          }
+        }
+      } else if (recurrenceAction === 'edit') {
+        if (action === 'single') {
+          // Editar apenas este agendamento
+          if (onUpdateAppointment) {
+            await onUpdateAppointment(event.resource.appointment.id, {
+              client_id: editData.client_id,
+              barber_id: editData.barber_id,
+              service_ids: editData.service_ids,
+              appointment_date: editData.appointment_date,
+              appointment_time: editData.appointment_time,
+              custom_duration: editData.custom_duration ? parseInt(editData.custom_duration) : null,
+              note: editData.note
+            });
+            toast.success('Agendamento atualizado com sucesso!');
+          }
+        } else {
+          // Editar toda a série recorrente
+          if (onUpdateRecurringAppointments && event.resource.appointment.recurrence_group_id) {
+            await onUpdateRecurringAppointments(event.resource.appointment.recurrence_group_id, {
+              client_id: editData.client_id,
+              barber_id: editData.barber_id,
+              service_ids: editData.service_ids,
+              note: editData.note
+            });
+          }
+        }
+        setIsEditing(false);
+      }
+
+      setShowRecurrenceModal(false);
+      onClose();
+    } catch (error) {
+      console.error('Erro na ação de recorrência:', error);
+      toast.error('Erro ao processar ação');
     }
   };
   
@@ -295,6 +364,13 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     // Validar duração personalizada se fornecida
     if (editData.custom_duration && (parseInt(editData.custom_duration) < 5 || parseInt(editData.custom_duration) > 480)) {
       toast.error('Duração personalizada deve estar entre 5 e 480 minutos');
+      return;
+    }
+    
+    // Verificar se é um agendamento recorrente
+    if (event?.resource.appointment?.recurrence_group_id) {
+      setRecurrenceAction('edit');
+      setShowRecurrenceModal(true);
       return;
     }
     
@@ -708,7 +784,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         onClose={() => setShowPaymentModal(false)}
         onConfirm={handlePaymentMethodSelect}
         title="Finalizar Agendamento"
-        originalAmount={event.resource.total}
+        originalAmount={event.resource.appointment.total_price}
         loading={updating}
       />
 
@@ -746,6 +822,16 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
           </div>
         </div>
       )}
+
+      {/* Modal de Ação de Recorrência */}
+      <RecurrenceActionModal
+        isOpen={showRecurrenceModal}
+        onClose={() => setShowRecurrenceModal(false)}
+        onSingleAction={() => handleRecurrenceAction('single')}
+        onAllAction={() => handleRecurrenceAction('all')}
+        actionType={recurrenceAction}
+        appointmentDate={event?.start ? new Date(event.start).toLocaleDateString('pt-BR') : ''}
+      />
     </div>
   );
 };

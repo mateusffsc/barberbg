@@ -192,6 +192,8 @@ export const useBarberReports = () => {
     const { data: appointments } = await supabase
       .from('appointments')
       .select(`
+        total_price,
+        final_amount,
         appointment_services(
           service_id,
           price_at_booking,
@@ -320,6 +322,8 @@ export const useBarberReports = () => {
       .from('appointments')
       .select(`
         appointment_datetime,
+        total_price,
+        final_amount,
         appointment_services(
           price_at_booking,
           commission_rate_applied
@@ -397,6 +401,8 @@ export const useBarberReports = () => {
         .from('appointments')
         .select(`
           appointment_datetime,
+          total_price,
+          final_amount,
           appointment_services(
             price_at_booking,
             commission_rate_applied

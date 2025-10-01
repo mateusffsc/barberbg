@@ -219,6 +219,9 @@ export const useAppointments = () => {
       // Criar agendamentos para todas as datas
       let firstAppointment = null;
       
+      // Gerar UUID para agrupar agendamentos recorrentes (apenas se houver mais de um)
+      const recurrenceGroupId = appointmentDates.length > 1 ? crypto.randomUUID() : null;
+      
       for (const date of appointmentDates) {
         // Criar agendamento
         const { data: appointment, error: appointmentError } = await supabase
@@ -238,7 +241,8 @@ export const useAppointments = () => {
             status: 'scheduled',
             total_price: totalPrice,
             duration_minutes: totalDuration, // Salvar duração calculada (customizada ou padrão)
-            note: formData.note?.trim() || null
+            note: formData.note?.trim() || null,
+            recurrence_group_id: recurrenceGroupId
           })
           .select()
           .single();
@@ -613,6 +617,174 @@ export const useAppointments = () => {
     }
   };
 
+  const deleteRecurringAppointments = async (recurrenceGroupId: string) => {
+    try {
+      // Buscar todos os agendamentos da série recorrente
+      const { data: appointments, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('recurrence_group_id', recurrenceGroupId);
+
+      if (fetchError) throw fetchError;
+
+      if (!appointments || appointments.length === 0) {
+        toast.error('Nenhum agendamento encontrado na série recorrente');
+        return false;
+      }
+
+      const appointmentIds = appointments.map(app => app.id);
+
+      // Primeiro deletar todos os serviços dos agendamentos
+      const { error: servicesError } = await supabase
+        .from('appointment_services')
+        .delete()
+        .in('appointment_id', appointmentIds);
+
+      if (servicesError) throw servicesError;
+
+      // Depois deletar todos os agendamentos
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('recurrence_group_id', recurrenceGroupId);
+
+      if (error) throw error;
+
+      toast.success(`${appointments.length} agendamentos da série recorrente excluídos com sucesso!`);
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao excluir agendamentos recorrentes:', error);
+      toast.error('Erro ao excluir agendamentos recorrentes');
+      return false;
+    }
+  };
+
+  const updateRecurringAppointments = async (
+    recurrenceGroupId: string,
+    updateData: {
+      client_id?: number;
+      barber_id?: number;
+      service_ids?: number[];
+      note?: string;
+    }
+  ) => {
+    try {
+      // Buscar todos os agendamentos da série recorrente
+      const { data: appointments, error: fetchError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('recurrence_group_id', recurrenceGroupId);
+
+      if (fetchError) throw fetchError;
+
+      if (!appointments || appointments.length === 0) {
+        toast.error('Nenhum agendamento encontrado na série recorrente');
+        return false;
+      }
+
+      // Se há mudança nos serviços, precisamos recalcular preços e durações
+      if (updateData.service_ids && updateData.service_ids.length > 0) {
+        // Buscar serviços selecionados
+        const { data: services, error: servicesError } = await supabase
+          .from('services')
+          .select('*')
+          .in('id', updateData.service_ids);
+
+        if (servicesError) throw servicesError;
+
+        // Buscar barbeiro (usar o novo ou o atual)
+        const barberId = updateData.barber_id || appointments[0].barber_id;
+        const { data: barber, error: barberError } = await supabase
+          .from('barbers')
+          .select('*')
+          .eq('id', barberId)
+          .single();
+
+        if (barberError) throw barberError;
+
+        // Calcular novo total e duração
+        const totalPrice = services.reduce((sum, service) => sum + service.price, 0);
+        
+        const isSpecialBarber = barber.is_special_barber || false;
+        const totalDuration = services.reduce((sum, service) => {
+          const serviceDuration = isSpecialBarber 
+            ? (service.duration_minutes_special || service.duration_minutes_normal || 30)
+            : (service.duration_minutes_normal || 30);
+          return sum + serviceDuration;
+        }, 0);
+
+        // Atualizar todos os agendamentos da série
+        const appointmentUpdates: any = {
+          ...(updateData.client_id && { client_id: updateData.client_id }),
+          ...(updateData.barber_id && { barber_id: updateData.barber_id }),
+          total_price: totalPrice,
+          duration_minutes: totalDuration,
+          ...(updateData.note !== undefined && { note: updateData.note })
+        };
+
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update(appointmentUpdates)
+          .eq('recurrence_group_id', recurrenceGroupId);
+
+        if (updateError) throw updateError;
+
+        // Remover todos os serviços antigos
+        const appointmentIds = appointments.map(app => app.id);
+        const { error: deleteServicesError } = await supabase
+          .from('appointment_services')
+          .delete()
+          .in('appointment_id', appointmentIds);
+
+        if (deleteServicesError) throw deleteServicesError;
+
+        // Adicionar novos serviços para todos os agendamentos
+        const allAppointmentServices = [];
+        for (const appointment of appointments) {
+          for (const service of services) {
+            const commissionRate = service.is_chemical 
+              ? barber.commission_rate_chemical_service
+              : barber.commission_rate_service;
+
+            allAppointmentServices.push({
+              appointment_id: appointment.id,
+              service_id: service.id,
+              price_at_booking: service.price,
+              commission_rate_applied: commissionRate
+            });
+          }
+        }
+
+        const { error: insertServicesError } = await supabase
+          .from('appointment_services')
+          .insert(allAppointmentServices);
+
+        if (insertServicesError) throw insertServicesError;
+      } else {
+        // Atualizar apenas campos básicos sem mudança de serviços
+        const appointmentUpdates: any = {
+          ...(updateData.client_id && { client_id: updateData.client_id }),
+          ...(updateData.barber_id && { barber_id: updateData.barber_id }),
+          ...(updateData.note !== undefined && { note: updateData.note })
+        };
+
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update(appointmentUpdates)
+          .eq('recurrence_group_id', recurrenceGroupId);
+
+        if (updateError) throw updateError;
+      }
+
+      toast.success(`${appointments.length} agendamentos da série recorrente atualizados com sucesso!`);
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao atualizar agendamentos recorrentes:', error);
+      toast.error('Erro ao atualizar agendamentos recorrentes');
+      return false;
+    }
+  };
+
   // Buscar bloqueios de agenda
   const loadScheduleBlocks = async (barberId?: number) => {
     try {
@@ -702,7 +874,7 @@ export const useAppointments = () => {
           barberId,
           client: appointment.client?.name || appointment.client_name || '',
           services: servicesNames.length > 0 ? servicesNames : (appointment.services_names ? appointment.services_names.split(', ') : []),
-          total: appointment.total_price,
+          total: appointment.final_amount || appointment.total_price,
           appointment
         }
       };
@@ -763,6 +935,8 @@ export const useAppointments = () => {
     updateAppointmentStatus,
     rescheduleAppointment,
     deleteAppointment,
+    deleteRecurringAppointments,
+    updateRecurringAppointments,
     loadScheduleBlocks,
     convertToCalendarEvents,
     createScheduleBlock,
