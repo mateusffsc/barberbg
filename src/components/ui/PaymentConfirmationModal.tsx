@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign } from 'lucide-react';
+import { formatCurrency, parseCurrency } from '../../utils/formatters';
 import { PaymentMethod, PAYMENT_METHODS } from '../../types/payment';
 
 interface PaymentConfirmationModalProps {
@@ -35,26 +36,53 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
 
   const handleConfirm = () => {
     if (selectedMethod && finalAmount) {
-      const numericAmount = parseFloat(finalAmount);
+      const numericAmount = parseCurrency(finalAmount);
       if (numericAmount > 0) {
         onConfirm(selectedMethod, numericAmount);
       }
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
+
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+    let value = e.target.value;
+    
+    // Permitir apenas números, vírgula e ponto
+    value = value.replace(/[^\d,\.]/g, '');
+    
+    // Se contém vírgula, substituir por ponto para cálculos
+    // Mas manter a vírgula na exibição se for o último caractere digitado
+    if (value.includes(',')) {
+      // Se há vírgula, garantir que só há uma
+      const parts = value.split(',');
+      if (parts.length > 2) {
+        value = parts[0] + ',' + parts.slice(1).join('');
+      }
+      
+      // Limitar casas decimais após a vírgula
+      if (parts[1] && parts[1].length > 2) {
+        value = parts[0] + ',' + parts[1].substring(0, 2);
+      }
+    } else if (value.includes('.')) {
+      // Se há ponto, garantir que só há um
+      const parts = value.split('.');
+      if (parts.length > 2) {
+        value = parts[0] + '.' + parts.slice(1).join('');
+      }
+      
+      // Limitar casas decimais após o ponto
+      if (parts[1] && parts[1].length > 2) {
+        value = parts[0] + '.' + parts[1].substring(0, 2);
+      }
+    }
+    
     setFinalAmount(value);
   };
 
-  const numericFinalAmount = parseFloat(finalAmount) || 0;
+
+
+  const numericFinalAmount = parseCurrency(finalAmount);
   const hasValueChanged = Math.abs(numericFinalAmount - originalAmount) > 0.01;
 
   return (
