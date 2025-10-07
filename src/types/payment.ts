@@ -6,6 +6,11 @@ export interface PaymentInfo {
   created_at: string;
 }
 
+export interface MultiplePaymentInfo {
+  method: PaymentMethod;
+  amount: number;
+}
+
 export interface PaymentMethodOption {
   value: PaymentMethod;
   label: string;

@@ -12,6 +12,7 @@ import { ConflictModal } from '../components/appointments/ConflictModal';
 import { BlockScheduleModal } from '../components/appointments/BlockScheduleModal';
 import { CalendarEvent } from '../types/appointment';
 import { PaymentMethod } from '../types/payment';
+import { Product } from '../types/product';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
@@ -419,13 +420,27 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (appointmentId: number, status: string, paymentMethod?: PaymentMethod, finalAmount?: number) => {
+  const handleStatusChange = async (appointmentId: number, status: string, paymentMethod?: PaymentMethod, finalAmount?: number, soldProducts?: { product: Product; quantity: number }[]) => {
     try {
       await updateAppointmentStatus(appointmentId, status, paymentMethod, finalAmount);
+      
+      // Se há produtos vendidos, registrar a venda
+      if (soldProducts && soldProducts.length > 0) {
+        console.log('Produtos vendidos:', soldProducts);
+        // TODO: Implementar lógica para registrar venda de produtos
+        // Isso pode incluir:
+        // - Criar registro de venda
+        // - Atualizar estoque dos produtos
+        // - Registrar comissões se aplicável
+      }
+      
       await loadAppointments();
       
       if (status === 'completed') {
-        toast.success('Agendamento finalizado com sucesso!');
+        const productMessage = soldProducts && soldProducts.length > 0 
+          ? ` e ${soldProducts.length} produto(s) vendido(s)`
+          : '';
+        toast.success(`Agendamento finalizado com sucesso${productMessage}!`);
       } else if (status === 'cancelled') {
         toast.success('Agendamento cancelado');
       } else {

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Edit3, Save, RotateCcw, Trash2 } from 'lucide-react';
 import { CalendarEvent } from '../../types/appointment';
-import { PaymentMethod } from '../../types/payment';
+import { PaymentMethod, MultiplePaymentInfo } from '../../types/payment';
 import { PaymentConfirmationModal } from '../ui/PaymentConfirmationModal';
 import { formatCurrency } from '../../utils/formatters';
 import { Client } from '../../types/client';
 import { Barber } from '../../types/barber';
 import { Service } from '../../types/service';
+import { Product } from '../../types/product';
 import toast from 'react-hot-toast';
 import RecurrenceActionModal from './RecurrenceActionModal';
 
@@ -14,7 +15,7 @@ interface AppointmentDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: CalendarEvent | null;
-  onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => Promise<void>;
+  onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number, soldProducts?: { product: Product; quantity: number }[]) => Promise<void>;
   onUpdateAppointment?: (appointmentId: number, updateData: any) => Promise<void>;
   onDeleteBlock?: (blockId: number) => Promise<void>;
   onDeleteAppointment?: (appointmentId: number) => Promise<void>;
@@ -300,9 +301,11 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     setShowPaymentModal(true);
   };
 
-  const handlePaymentMethodSelect = (paymentMethod: PaymentMethod, finalAmount: number) => {
+  const handlePaymentMethodSelect = (payments: MultiplePaymentInfo[], finalAmount: number, soldProducts?: { product: Product; quantity: number }[]) => {
     setShowPaymentModal(false);
-    handleStatusChange('completed', paymentMethod, finalAmount);
+    // Para manter compatibilidade, usamos o primeiro método de pagamento
+    const primaryPayment = payments[0];
+    handleStatusChange('completed', primaryPayment.method, finalAmount, soldProducts);
   };
 
   const handleEdit = () => {
