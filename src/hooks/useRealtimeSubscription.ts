@@ -25,28 +25,21 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
   } = options;
 
   const handleRealtimeEvent = useCallback((payload: any) => {
-    console.log(`🔄 Realtime: Mudança detectada na tabela ${table}:`, payload);
-    console.log(`🔄 Realtime: Tipo de evento: ${payload.eventType}`);
-    console.log(`🔄 Realtime: Dados do payload:`, payload.new || payload.old);
-
     // Chamar callback específico baseado no tipo de evento
     switch (payload.eventType) {
       case 'INSERT':
-        console.log(`✅ Realtime: Executando onInsert para tabela ${table}`);
         onInsert?.(payload);
         if (showNotifications) {
           toast.success('Novo registro criado!');
         }
         break;
       case 'UPDATE':
-        console.log(`🔄 Realtime: Executando onUpdate para tabela ${table}`);
         onUpdate?.(payload);
         if (showNotifications) {
           toast.success('Registro atualizado!');
         }
         break;
       case 'DELETE':
-        console.log(`❌ Realtime: Executando onDelete para tabela ${table}`);
         onDelete?.(payload);
         if (showNotifications) {
           toast.success('Registro removido!');
@@ -56,16 +49,11 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
 
     // Chamar callback genérico se fornecido
     if (onChange) {
-      console.log(`🔄 Realtime: Executando onChange callback para tabela ${table}`);
       onChange(payload);
-    } else {
-      console.log(`⚠️ Realtime: Nenhum onChange callback definido para tabela ${table}`);
     }
   }, [table, onInsert, onUpdate, onDelete, onChange, showNotifications]);
 
   const setupSubscription = useCallback(() => {
-    console.log(`🚀 Realtime: Configurando subscription para tabela ${table}`);
-    
     // Limpar timeout de reconexão anterior se existir
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -74,7 +62,6 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
     
     // Remover subscription anterior se existir
     if (channelRef.current) {
-      console.log(`🔄 Realtime: Removendo subscription anterior para tabela ${table}`);
       channelRef.current.unsubscribe();
     }
 
@@ -91,27 +78,18 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
         handleRealtimeEvent
       )
       .subscribe((status) => {
-        console.log(`📡 Realtime: Status da subscription para ${table}:`, status);
-        
         // Implementar reconexão automática em caso de erro
         if (status === 'CHANNEL_ERROR') {
-          console.log(`❌ Realtime: Erro na subscription da tabela ${table}, tentando reconectar em 3 segundos...`);
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log(`🔄 Realtime: Reconectando subscription para tabela ${table}`);
             setupSubscription();
           }, 3000);
-        } else if (status === 'SUBSCRIBED') {
-          console.log(`✅ Realtime: Subscription ativa para tabela ${table}`);
         }
       });
 
     channelRef.current = channel;
-    console.log(`✅ Realtime: Subscription configurada para tabela ${table}`);
   }, [table, handleRealtimeEvent]);
 
   const unsubscribe = useCallback(() => {
-    console.log(`🛑 Realtime: Desconectando subscription para tabela ${table}`);
-    
     // Limpar timeout de reconexão se existir
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);

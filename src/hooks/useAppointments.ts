@@ -47,50 +47,81 @@ export const useAppointments = () => {
     barberId?: number
   ): Promise<AppointmentsResponse> => {
     try {
-      let query = supabase
-        .from('appointments')
-        .select(`
-          *,
-          client:clients(id, name),
-          barber:barbers(id, name, is_special_barber),
-          appointment_services(
-            service_id,
-            price_at_booking,
-            commission_rate_applied,
-            service:services(id, name, duration_minutes_normal, duration_minutes_special, is_chemical)
-          )
-        `, { count: 'exact' })
-        .order('appointment_datetime');
+      // Função para buscar uma página de agendamentos
+      const fetchPage = async (from: number, to: number) => {
+        let query = supabase
+          .from('appointments')
+          .select(`
+            *,
+            client:clients(id, name),
+            barber:barbers(id, name, is_special_barber),
+            appointment_services(
+              service_id,
+              price_at_booking,
+              commission_rate_applied,
+              service:services(id, name, duration_minutes_normal, duration_minutes_special, is_chemical)
+            )
+          `, { count: 'exact' })
+          .order('appointment_datetime')
+          .range(from, to);
 
-      // Filtrar por período se fornecido
-      if (startDate) {
-        query = query.gte('appointment_datetime', startDate.toISOString());
+        // Filtrar por período se fornecido
+        if (startDate) {
+          query = query.gte('appointment_datetime', startDate.toISOString());
+        }
+        if (endDate) {
+          query = query.lte('appointment_datetime', endDate.toISOString());
+        }
+
+        // Filtrar por barbeiro se fornecido ou se usuário é barbeiro
+        if (barberId) {
+          query = query.eq('barber_id', barberId);
+        } else if (user?.role === 'barber' && user.barber?.id) {
+          query = query.eq('barber_id', user.barber.id);
+        }
+
+        return await query;
+      };
+
+      // Primeira consulta para obter o count total
+      const { data: firstPage, count, error: firstError } = await fetchPage(0, 999);
+      
+      if (firstError) throw firstError;
+
+      let allData = firstPage || [];
+      
+      // Se há mais de 1000 registros, buscar as páginas restantes
+      if (count && count > 1000) {
+        const totalPages = Math.ceil(count / 1000);
+        
+        for (let page = 1; page < totalPages; page++) {
+          const from = page * 1000;
+          const to = from + 999;
+          
+          const { data: pageData, error: pageError } = await fetchPage(from, to);
+          
+          if (pageError) {
+            console.error(`Erro ao buscar página ${page + 1}:`, pageError);
+            continue; // Continua com as outras páginas mesmo se uma falhar
+          }
+          
+          if (pageData) {
+            allData = [...allData, ...pageData];
+          }
+        }
       }
-      if (endDate) {
-        query = query.lte('appointment_datetime', endDate.toISOString());
-      }
-
-      // Filtrar por barbeiro se fornecido ou se usuário é barbeiro
-      if (barberId) {
-        query = query.eq('barber_id', barberId);
-      } else if (user?.role === 'barber' && user.barber?.id) {
-        query = query.eq('barber_id', user.barber.id);
-      }
-
-      const { data, count, error } = await query;
-
-      if (error) throw error;
 
       // Transformar dados para incluir serviços
-      const appointmentsWithServices = (data || []).map(appointment => ({
+      const appointmentsWithServices = (allData || []).map(appointment => ({
         ...appointment,
         services: appointment.appointment_services?.map((as: any) => ({
           id: as.service.id,
           name: as.service.name,
-          price: as.price_at_booking,
           duration_minutes_normal: as.service.duration_minutes_normal,
           duration_minutes_special: as.service.duration_minutes_special,
-          is_chemical: as.service.is_chemical
+          is_chemical: as.service.is_chemical,
+          price_at_booking: as.price_at_booking,
+          commission_rate_applied: as.commission_rate_applied
         })) || []
       }));
 

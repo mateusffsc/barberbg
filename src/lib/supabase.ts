@@ -12,6 +12,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     params: {
       eventsPerSecond: 10
     }
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'Prefer': 'count=exact'
+    }
   }
 });
 
