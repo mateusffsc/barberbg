@@ -550,13 +550,24 @@ export const Appointments: React.FC = () => {
   };
 
   const handleDeleteBlock = async (blockId: number) => {
+    console.log('🔍 Appointments.handleDeleteBlock chamado com ID:', blockId);
     try {
+      console.log('🗑️ Chamando deleteScheduleBlock...');
       await deleteScheduleBlock(blockId);
+      console.log('✅ deleteScheduleBlock executado com sucesso');
+      
+      console.log('🔄 Recarregando agendamentos...');
       await reloadAppointmentsWithFilters();
+      console.log('✅ Agendamentos recarregados');
+      
+      console.log('🚪 Fechando modal...');
       setIsDetailsModalOpen(false);
+      console.log('✅ Modal fechado');
+      
       toast.success('Bloqueio removido com sucesso!');
+      console.log('✅ Toast de sucesso exibido');
     } catch (error) {
-      console.error('Erro ao remover bloqueio:', error);
+      console.error('❌ Erro ao remover bloqueio:', error);
       toast.error('Erro ao remover bloqueio');
     }
   };
@@ -731,9 +742,11 @@ export const Appointments: React.FC = () => {
                 onStatusChange={handleStatusChange}
                 onCompleteWithPayment={handleCompleteWithPayment}
                 onDeleteAppointment={handleDeleteAppointment}
+                onDeleteBlock={handleDeleteBlock}
                 loading={isLoading}
                 barbers={barbers}
                 selectedDate={selectedCalendarDate}
+                instantBlockDeletion={true}
               />
             </div>
           </div>
@@ -823,9 +836,11 @@ export const Appointments: React.FC = () => {
                 onStatusChange={handleStatusChange}
                 onCompleteWithPayment={handleCompleteWithPayment}
                 onDeleteAppointment={handleDeleteAppointment}
+                onDeleteBlock={handleDeleteBlock}
                 loading={isLoading}
                 barbers={barbers}
                 selectedDate={selectedCalendarDate}
+                instantBlockDeletion={true}
               />
             </div>
           </div>

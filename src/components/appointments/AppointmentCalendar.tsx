@@ -29,9 +29,11 @@ interface AppointmentCalendarProps {
   onStatusChange: (appointmentId: number, newStatus: string) => void;
   onCompleteWithPayment: (event: CalendarEvent) => void;
   onDeleteAppointment?: (appointmentId: number) => void;
+  onDeleteBlock?: (blockId: number) => void;
   loading?: boolean;
   barbers?: Array<{ id: string; name: string; avatar?: string }>;
   selectedDate?: Date;
+  instantBlockDeletion?: boolean; // Nova prop para exclusão instantânea de bloqueios na visualização de dia
 }
 
 export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
@@ -42,9 +44,11 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onStatusChange,
   onCompleteWithPayment,
   onDeleteAppointment,
+  onDeleteBlock,
   loading = false,
   barbers = [],
-  selectedDate
+  selectedDate,
+  instantBlockDeletion = false
 }) => {
   const [view, setView] = useState<View>(Views.DAY);
   const [date, setDate] = useState(new Date());
@@ -68,6 +72,20 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Função para lidar com clique em eventos na visualização de dia
+  const handleDayViewEventClick = useCallback((event: CalendarEvent) => {
+    // Se for um bloqueio e a exclusão instantânea estiver habilitada na visualização de dia
+    if (event.resource.isBlock && instantBlockDeletion && view === Views.DAY && onDeleteBlock) {
+      // Confirmar exclusão instantânea
+      if (window.confirm('Tem certeza que deseja excluir este bloqueio? Esta ação não pode ser desfeita.')) {
+        onDeleteBlock(event.resource.blockData.id);
+      }
+    } else {
+      // Comportamento padrão - abrir modal de detalhes
+      onSelectEvent(event);
+    }
+  }, [instantBlockDeletion, view, onDeleteBlock, onSelectEvent]);
 
   // Sincronizar data interna com selectedDate
   React.useEffect(() => {
@@ -272,14 +290,14 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
               <DayViewCalendar
                 events={events}
                 date={date}
-                onSelectEvent={onSelectEvent}
+                onSelectEvent={handleDayViewEventClick}
                 onSelectSlot={onSelectSlot}
               />
             ) : (
               <DayViewDesktop
                 events={events}
                 date={date}
-                onSelectEvent={onSelectEvent}
+                onSelectEvent={handleDayViewEventClick}
                 onSelectSlot={onSelectSlot}
                 barbers={barbers}
               />
@@ -312,8 +330,13 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
               closeContextMenu();
             }}
             onDelete={() => {
-              if (contextMenu.event && onDeleteAppointment) {
-                onDeleteAppointment(contextMenu.event.resource.appointment.id);
+              if (contextMenu.event) {
+                // Verificar se é um bloqueio ou agendamento
+                if (contextMenu.event.resource.isBlock && onDeleteBlock) {
+                  onDeleteBlock(contextMenu.event.resource.blockData.id);
+                } else if (!contextMenu.event.resource.isBlock && onDeleteAppointment) {
+                  onDeleteAppointment(contextMenu.event.resource.appointment.id);
+                }
               }
               closeContextMenu();
             }}
@@ -469,8 +492,13 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             closeContextMenu();
           }}
           onDelete={() => {
-            if (contextMenu.event && onDeleteAppointment) {
-              onDeleteAppointment(contextMenu.event.resource.appointment.id);
+            if (contextMenu.event) {
+              // Verificar se é um bloqueio ou agendamento
+              if (contextMenu.event.resource.isBlock && onDeleteBlock) {
+                onDeleteBlock(contextMenu.event.resource.blockData.id);
+              } else if (!contextMenu.event.resource.isBlock && onDeleteAppointment) {
+                onDeleteAppointment(contextMenu.event.resource.appointment.id);
+              }
             }
             closeContextMenu();
           }}
@@ -675,8 +703,13 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           closeContextMenu();
         }}
         onDelete={() => {
-          if (contextMenu.event && onDeleteAppointment) {
-            onDeleteAppointment(contextMenu.event.resource.appointment.id);
+          if (contextMenu.event) {
+            // Verificar se é um bloqueio ou agendamento
+            if (contextMenu.event.resource.isBlock && onDeleteBlock) {
+              onDeleteBlock(contextMenu.event.resource.blockData.id);
+            } else if (!contextMenu.event.resource.isBlock && onDeleteAppointment) {
+              onDeleteAppointment(contextMenu.event.resource.appointment.id);
+            }
           }
           closeContextMenu();
         }}

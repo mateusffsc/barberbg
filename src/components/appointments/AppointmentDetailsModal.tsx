@@ -79,13 +79,28 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   }, [event]);
   
   const handleDeleteBlock = async () => {
-    if (!event?.resource.blockData?.id || !onDeleteBlock) return;
+    console.log('🔍 handleDeleteBlock chamado');
+    console.log('📋 event:', event);
+    console.log('📋 event.resource:', event?.resource);
+    console.log('📋 event.resource.blockData:', event?.resource.blockData);
+    console.log('📋 event.resource.blockData.id:', event?.resource.blockData?.id);
+    console.log('📋 onDeleteBlock:', onDeleteBlock);
+    
+    if (!event?.resource.blockData?.id || !onDeleteBlock) {
+      console.log('❌ Condição falhou - retornando');
+      console.log('❌ blockData.id existe?', !!event?.resource.blockData?.id);
+      console.log('❌ onDeleteBlock existe?', !!onDeleteBlock);
+      return;
+    }
     
     try {
+      console.log('🗑️ Chamando onDeleteBlock com ID:', event.resource.blockData.id);
       await onDeleteBlock(event.resource.blockData.id);
+      console.log('✅ onDeleteBlock executado com sucesso');
       setShowDeleteConfirmation(false);
+      console.log('✅ Modal de confirmação fechado');
     } catch (error) {
-      console.error('Erro ao excluir bloqueio:', error);
+      console.error('❌ Erro ao excluir bloqueio:', error);
     }
   };
 
