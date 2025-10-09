@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Appointment, AppointmentFormData, AppointmentsResponse, CalendarEvent } from '../types/appointment';
 import { Service } from '../types/service';
@@ -7,12 +7,39 @@ import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
 import { fromLocalDateTimeString, toLocalISOString } from '../utils/dateHelpers';
 import toast from 'react-hot-toast';
+import { useRealtimeSubscription } from './useRealtimeSubscription';
 
 export const useAppointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const { user } = useAuth();
+
+  // Função para recarregar appointments
+  const reloadAppointments = useCallback(async (startDate?: Date, endDate?: Date, barberId?: number) => {
+    console.log('🔄 useAppointments: Iniciando recarregamento de agendamentos...');
+    try {
+      const response = await fetchAppointments(startDate, endDate, barberId);
+      setAppointments(response.appointments);
+      setTotalCount(response.count);
+      console.log('✅ useAppointments: Agendamentos recarregados com sucesso:', response.appointments.length, 'agendamentos');
+    } catch (error) {
+      console.error('❌ useAppointments: Erro ao recarregar agendamentos:', error);
+    }
+  }, []);
+
+  // Configurar subscription em tempo real para appointments
+  useRealtimeSubscription({
+    table: 'appointments',
+    onChange: (payload) => {
+      console.log('🔄 useAppointments: Recebido evento de mudança na tabela appointments:', payload);
+      // Recarregar dados quando houver qualquer mudança
+      // Nota: Como não temos acesso aos filtros atuais aqui, recarregamos sem filtros
+      // O componente deve chamar reloadAppointments com os filtros corretos quando necessário
+      reloadAppointments();
+    },
+    showNotifications: false // Desabilitar notificações automáticas para evitar spam
+  });
 
   const fetchAppointments = async (
     startDate?: Date,
@@ -378,21 +405,25 @@ export const useAppointments = () => {
           updateData.final_amount = finalAmount;
         }
       }
-
+  
       const { error } = await supabase
         .from('appointments')
         .update(updateData)
         .eq('id', id);
-
+  
       if (error) throw error;
-
+  
       const statusMessages = {
         completed: 'Agendamento marcado como concluído',
         cancelled: 'Agendamento cancelado',
         no_show: 'Agendamento marcado como não compareceu'
       };
-
+  
       toast.success(statusMessages[status as keyof typeof statusMessages] || 'Status atualizado');
+      
+      // Recarregar agendamentos após atualização bem-sucedida
+      await reloadAppointments();
+  
       return true;
     } catch (error: any) {
       console.error('Erro ao atualizar status:', error);
@@ -512,6 +543,10 @@ export const useAppointments = () => {
       if (insertServicesError) throw insertServicesError;
 
       toast.success('Agendamento atualizado com sucesso!');
+      
+      // Recarregar agendamentos após atualização bem-sucedida
+      await reloadAppointments();
+      
       return true;
     } catch (error: any) {
       console.error('Erro ao atualizar agendamento:', error);
@@ -609,6 +644,10 @@ export const useAppointments = () => {
       if (error) throw error;
 
       toast.success('Agendamento excluído com sucesso!');
+      
+      // Recarregar agendamentos após exclusão bem-sucedida
+      await reloadAppointments();
+      
       return true;
     } catch (error: any) {
       console.error('Erro ao excluir agendamento:', error);
@@ -940,6 +979,7 @@ export const useAppointments = () => {
     loadScheduleBlocks,
     convertToCalendarEvents,
     createScheduleBlock,
-    deleteScheduleBlock
+    deleteScheduleBlock,
+    reloadAppointments
   };
 };

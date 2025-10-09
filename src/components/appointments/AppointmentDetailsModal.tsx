@@ -79,40 +79,18 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   }, [event]);
   
   const handleDeleteBlock = async () => {
-    console.log('=== INÍCIO handleDeleteBlock ===');
-    console.log('handleDeleteBlock chamado');
-    console.log('event:', event);
-    console.log('event.resource:', event?.resource);
-    console.log('event.resource.blockData:', event?.resource?.blockData);
-    console.log('onDeleteBlock:', onDeleteBlock);
-    console.log('typeof onDeleteBlock:', typeof onDeleteBlock);
-    
-    if (!event?.resource?.blockData?.id || !onDeleteBlock) {
-      console.log('❌ Condição falhou - não executando exclusão');
-      console.log('blockData.id:', event?.resource?.blockData?.id);
-      console.log('onDeleteBlock exists:', !!onDeleteBlock);
-      console.log('=== FIM handleDeleteBlock (FALHOU) ===');
-      return;
-    }
+    if (!event?.resource.blockData?.id || !onDeleteBlock) return;
     
     try {
-      console.log('✅ Tentando excluir bloqueio com ID:', event.resource.blockData.id);
-      console.log('Chamando onDeleteBlock...');
-      const result = await onDeleteBlock(event.resource.blockData.id);
-      console.log('Resultado da exclusão:', result);
-      console.log('Fechando modal de confirmação...');
+      await onDeleteBlock(event.resource.blockData.id);
       setShowDeleteConfirmation(false);
-      console.log('Fechando modal principal...');
-      onClose();
-      console.log('=== FIM handleDeleteBlock (SUCESSO) ===');
     } catch (error) {
-      console.error('❌ Erro ao excluir bloqueio:', error);
-      console.log('=== FIM handleDeleteBlock (ERRO) ===');
+      console.error('Erro ao excluir bloqueio:', error);
     }
   };
 
   const handleDeleteAppointment = async () => {
-    if (!event?.resource?.appointment?.id || !onDeleteAppointment) return;
+    if (!event?.resource.appointment?.id || !onDeleteAppointment) return;
     
     // Verificar se é um agendamento recorrente
     if (event.resource.appointment.recurrence_group_id) {
@@ -140,7 +118,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       if (recurrenceAction === 'delete') {
         if (action === 'single') {
           // Excluir apenas este agendamento
-          if (onDeleteAppointment && event?.resource?.appointment?.id) {
+          if (onDeleteAppointment) {
             await onDeleteAppointment(event.resource.appointment.id);
             toast.success('Agendamento excluído com sucesso!');
           }
@@ -153,7 +131,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       } else if (recurrenceAction === 'edit') {
         if (action === 'single') {
           // Editar apenas este agendamento
-          if (onUpdateAppointment && event?.resource?.appointment?.id) {
+          if (onUpdateAppointment) {
             await onUpdateAppointment(event.resource.appointment.id, {
               client_id: editData.client_id,
               barber_id: editData.barber_id,
@@ -271,37 +249,6 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
           </div>
         </div>
         
-        {/* Modal de Confirmação de Exclusão para Bloqueios */}
-        {showDeleteConfirmation && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
-              <div className="p-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <AlertCircle className="h-6 w-6 text-red-500" />
-                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Exclusão</h3>
-                </div>
-                <p className="text-gray-600 mb-6">
-                  Tem certeza que deseja excluir este bloqueio? Esta ação não pode ser desfeita.
-                </p>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => setShowDeleteConfirmation(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleDeleteBlock}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-600 rounded-md hover:bg-red-700 flex items-center space-x-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span>Excluir</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -334,7 +281,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   };
 
   const handleStatusChange = async (newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number) => {
-    if (!onStatusChange || !event || !event.resource?.appointment?.id) return;
+    if (!onStatusChange || !event) return;
     
     setUpdating(true);
     try {
@@ -386,7 +333,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   };
 
   const handleSaveEdit = async () => {
-    if (!onUpdateAppointment || !event?.resource?.appointment?.id) return;
+    if (!onUpdateAppointment) return;
     
     // Validações
     if (!editData.client_id) {

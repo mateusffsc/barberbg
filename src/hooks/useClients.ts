@@ -2,11 +2,33 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Client, ClientFormData, ClientsResponse } from '../types/client';
 import toast from 'react-hot-toast';
+import { useRealtimeSubscription } from './useRealtimeSubscription';
 
 export const useClients = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Função para recarregar clientes
+  const reloadClients = async () => {
+    try {
+      const response = await fetchClients();
+      setClients(response.clients);
+      setTotalCount(response.count);
+    } catch (error) {
+      console.error('Erro ao recarregar clientes:', error);
+    }
+  };
+
+  // Configurar subscription em tempo real para clientes
+  useRealtimeSubscription({
+    table: 'clients',
+    onChange: () => {
+      // Recarregar dados quando houver qualquer mudança
+      reloadClients();
+    },
+    showNotifications: false
+  });
 
   const fetchClients = async (
     page: number = 1,

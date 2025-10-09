@@ -175,12 +175,6 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
   const handleContextMenu = (event: CalendarEvent, e: React.MouseEvent) => {
     e.preventDefault();
-    
-    // Não mostrar menu de contexto para bloqueios
-    if (event.resource.isBlock) {
-      return;
-    }
-    
     setContextMenu({
       show: true,
       x: e.clientX,
@@ -476,13 +470,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           }}
           onDelete={() => {
             if (contextMenu.event && onDeleteAppointment) {
-              // Verificar se é um bloqueio ou agendamento
-              if (contextMenu.event.resource.isBlock) {
-                // Para bloqueios, não fazer nada aqui pois o menu de contexto não deveria aparecer para bloqueios
-                console.log('Tentativa de excluir bloqueio via menu de contexto - ignorando');
-              } else if (contextMenu.event.resource.appointment?.id) {
-                onDeleteAppointment(contextMenu.event.resource.appointment.id);
-              }
+              onDeleteAppointment(contextMenu.event.resource.appointment.id);
             }
             closeContextMenu();
           }}
@@ -669,13 +657,13 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         event={contextMenu.event}
         onClose={closeContextMenu}
         onStatusChange={(status) => {
-          if (contextMenu.event && !contextMenu.event.resource.isBlock) {
+          if (contextMenu.event) {
             onStatusChange(contextMenu.event.resource.appointment.id, status);
           }
           closeContextMenu();
         }}
         onCompleteWithPayment={() => {
-          if (contextMenu.event && !contextMenu.event.resource.isBlock) {
+          if (contextMenu.event) {
             onCompleteWithPayment(contextMenu.event);
           }
           closeContextMenu();
@@ -688,13 +676,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         }}
         onDelete={() => {
           if (contextMenu.event && onDeleteAppointment) {
-            // Verificar se é um bloqueio ou agendamento
-            if (contextMenu.event.resource.isBlock) {
-              // Para bloqueios, não fazer nada aqui pois o menu de contexto não deveria aparecer para bloqueios
-              console.log('Tentativa de excluir bloqueio via menu de contexto - ignorando');
-            } else if (contextMenu.event.resource.appointment?.id) {
-              onDeleteAppointment(contextMenu.event.resource.appointment.id);
-            }
+            onDeleteAppointment(contextMenu.event.resource.appointment.id);
           }
           closeContextMenu();
         }}

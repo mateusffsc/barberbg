@@ -18,6 +18,7 @@ import { useBarbers } from '../hooks/useBarbers';
 import { useServices } from '../hooks/useServices';
 import { useProducts } from '../hooks/useProducts';
 import { useSales } from '../hooks/useSales';
+import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import toast from 'react-hot-toast';
 
 export const Dashboard: React.FC = () => {
@@ -85,29 +86,27 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     // Carregar dados iniciais apenas uma vez
     loadInitialData();
-
-    // Configurar listener para mudanças em agendamentos
-    const channel = supabase
-      .channel('dashboard_appointments')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'appointments',
-          filter: `appointment_datetime=gte.${new Date().toISOString().split('T')[0]}`
-        }, 
-        (payload) => {
-          console.log('Agendamento atualizado, recarregando dashboard:', payload);
-          // Recarregar apenas os dados de hoje
-          loadTodayAppointments();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
+
+  // Configurar subscriptions em tempo real para o dashboard
+  useRealtimeSubscription({
+    table: 'appointments',
+    onChange: () => {
+      // Recarregar dados do dashboard quando houver mudanças em agendamentos
+      loadDashboardData();
+      loadTodayAppointments();
+    },
+    showNotifications: false
+  });
+
+  useRealtimeSubscription({
+    table: 'sales',
+    onChange: () => {
+      // Recarregar dados do dashboard quando houver mudanças em vendas
+      loadDashboardData();
+    },
+    showNotifications: false
+  });
 
   const loadTodayAppointments = async () => {
     try {

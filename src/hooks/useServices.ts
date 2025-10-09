@@ -3,11 +3,33 @@ import { supabase } from '../lib/supabase';
 import { Service, ServiceFormData, ServicesResponse } from '../types/service';
 import { parseCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
+import { useRealtimeSubscription } from './useRealtimeSubscription';
 
 export const useServices = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Função para recarregar serviços
+  const reloadServices = async () => {
+    try {
+      const response = await fetchServices();
+      setServices(response.services);
+      setTotalCount(response.count);
+    } catch (error) {
+      console.error('Erro ao recarregar serviços:', error);
+    }
+  };
+
+  // Configurar subscription em tempo real para serviços
+  useRealtimeSubscription({
+    table: 'services',
+    onChange: () => {
+      // Recarregar dados quando houver qualquer mudança
+      reloadServices();
+    },
+    showNotifications: false
+  });
 
   const fetchServices = async (
     page: number = 1,

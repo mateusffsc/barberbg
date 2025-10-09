@@ -31,7 +31,8 @@ export const Appointments: React.FC = () => {
     updateRecurringAppointments,
     convertToCalendarEvents,
     createScheduleBlock,
-    deleteScheduleBlock
+    deleteScheduleBlock,
+    reloadAppointments
   } = useAppointments();
 
   const {
@@ -191,6 +192,11 @@ export const Appointments: React.FC = () => {
     }
   };
 
+  // Função para recarregar com filtros atuais
+  const reloadAppointmentsWithFilters = async () => {
+    await reloadAppointments(undefined, undefined, selectedBarberId || undefined);
+  };
+
   const loadClients = async () => {
     try {
       const response = await fetchClients(1, '', 1000); // Buscar todos os clientes
@@ -254,7 +260,7 @@ export const Appointments: React.FC = () => {
       }
 
       await createAppointment(appointmentData, selectedServices, selectedBarber, recurrence);
-      await loadAppointments();
+      await reloadAppointmentsWithFilters();
       setIsModalOpen(false);
       toast.success('Agendamento criado com sucesso!');
     } catch (error: any) {
@@ -375,7 +381,7 @@ export const Appointments: React.FC = () => {
         pendingRecurrence,
         true // allowOverlap = true para permitir sobreposição
       );
-      await loadAppointments();
+      await reloadAppointmentsWithFilters();
       setConflictModalOpen(false);
       setPendingAppointmentData(null);
       setPendingSelectedServices([]);
@@ -410,7 +416,7 @@ export const Appointments: React.FC = () => {
         await updateAppointment(event.extendedProps.appointment.id, {
           appointment_datetime: newStart.toISOString()
         });
-        await loadAppointments();
+        await reloadAppointmentsWithFilters();
         toast.success('Agendamento reagendado com sucesso!');
       }
     } catch (error) {
@@ -434,7 +440,7 @@ export const Appointments: React.FC = () => {
         // - Registrar comissões se aplicável
       }
       
-      await loadAppointments();
+      await reloadAppointmentsWithFilters();
       
       if (status === 'completed') {
         const productMessage = soldProducts && soldProducts.length > 0 
@@ -508,7 +514,7 @@ export const Appointments: React.FC = () => {
 
       if (updateError) throw updateError;
 
-      await loadAppointments();
+      await reloadAppointmentsWithFilters();
       toast.success(`${todayAppointments.length} agendamentos marcados como concluídos!`);
     } catch (error) {
       console.error('Erro ao concluir agendamentos:', error);
@@ -534,7 +540,7 @@ export const Appointments: React.FC = () => {
   const handleBlockSchedule = async (blockData: any) => {
     try {
       await createScheduleBlock(blockData);
-      await loadAppointments();
+      await reloadAppointmentsWithFilters();
       setShowBlockModal(false);
       toast.success('Horário bloqueado com sucesso!');
     } catch (error) {
@@ -546,7 +552,7 @@ export const Appointments: React.FC = () => {
   const handleDeleteBlock = async (blockId: number) => {
     try {
       await deleteScheduleBlock(blockId);
-      await loadAppointments();
+      await reloadAppointmentsWithFilters();
       setIsDetailsModalOpen(false);
       toast.success('Bloqueio removido com sucesso!');
     } catch (error) {
@@ -559,7 +565,7 @@ export const Appointments: React.FC = () => {
     try {
       const success = await deleteAppointment(appointmentId.toString());
       if (success) {
-        await loadAppointments();
+        await reloadAppointmentsWithFilters();
         toast.success('Agendamento excluído com sucesso!');
       }
     } catch (error) {
@@ -757,7 +763,16 @@ export const Appointments: React.FC = () => {
                 Bloquear
               </button>
 
-
+              {getTodayScheduledCount() > 0 && (
+                <button
+                  onClick={handleCompleteAllToday}
+                  disabled={completingAll || isLoading}
+                  className="col-span-2 inline-flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <CheckCircle2 className={`h-4 w-4 mr-2 ${completingAll ? 'animate-spin' : ''}`} />
+                  Concluir Todos ({getTodayScheduledCount()})
+                </button>
+              )}
             </div>
           </div>
 
@@ -873,4 +888,17 @@ export const Appointments: React.FC = () => {
       />
     </div>
   );
+};
+
+const updateAppointment = async (appointmentId: number, updateData: any) => {
+  try {
+    const success = await updateAppointment(appointmentId, updateData);
+    if (success) {
+      await reloadAppointmentsWithFilters();
+      toast.success('Agendamento atualizado com sucesso!');
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar agendamento:', error);
+    toast.error('Erro ao atualizar agendamento');
+  }
 };

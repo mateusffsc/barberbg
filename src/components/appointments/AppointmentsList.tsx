@@ -154,17 +154,9 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Não mostrar menu de contexto para bloqueios
-                            if (!event.resource.isBlock) {
-                              onContextMenu(event, e);
-                            }
+                            onContextMenu(event, e);
                           }}
-                          className={`p-1 rounded transition-colors ${
-                            event.resource.isBlock 
-                              ? 'text-gray-300 cursor-not-allowed' 
-                              : 'text-gray-400 hover:text-gray-600'
-                          }`}
-                          disabled={event.resource.isBlock}
+                          className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </button>

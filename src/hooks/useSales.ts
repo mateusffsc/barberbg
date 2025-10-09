@@ -1,17 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Sale, CartItem, SalesResponse } from '../types/sale';
-import { Product } from '../types/product';
-import { Barber } from '../types/barber';
-import { PaymentMethod } from '../types/payment';
+import { Sale, SaleFormData, SalesResponse } from '../types/sale';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { useRealtimeSubscription } from './useRealtimeSubscription';
 
 export const useSales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const { user } = useAuth();
+
+  // Função para recarregar vendas
+  const reloadSales = async () => {
+    try {
+      const response = await fetchSales();
+      setSales(response.sales);
+      setTotalCount(response.count);
+    } catch (error) {
+      console.error('Erro ao recarregar vendas:', error);
+    }
+  };
+
+  // Configurar subscription em tempo real para vendas
+  useRealtimeSubscription({
+    table: 'sales',
+    onChange: () => {
+      // Recarregar dados quando houver qualquer mudança
+      reloadSales();
+    },
+    showNotifications: false
+  });
 
   const fetchSales = async (
     page: number = 1,

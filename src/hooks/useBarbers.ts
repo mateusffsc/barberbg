@@ -2,11 +2,33 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Barber, BarberFormData, BarberUpdateData, BarbersResponse } from '../types/barber';
 import toast from 'react-hot-toast';
+import { useRealtimeSubscription } from './useRealtimeSubscription';
 
 export const useBarbers = () => {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Função para recarregar barbeiros
+  const reloadBarbers = async () => {
+    try {
+      const response = await fetchBarbers();
+      setBarbers(response.barbers);
+      setTotalCount(response.count);
+    } catch (error) {
+      console.error('Erro ao recarregar barbeiros:', error);
+    }
+  };
+
+  // Configurar subscription em tempo real para barbeiros
+  useRealtimeSubscription({
+    table: 'barbers',
+    onChange: () => {
+      // Recarregar dados quando houver qualquer mudança
+      reloadBarbers();
+    },
+    showNotifications: false
+  });
 
   const fetchBarbers = async (
     page: number = 1,
