@@ -86,7 +86,7 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
   // Função para obter cor do evento
   const getEventColor = (status: string, isBlock: boolean = false) => {
     if (isBlock) {
-      return 'bg-gradient-to-r from-green-500 to-green-600 text-white border-green-600';
+      return 'bg-gradient-to-r from-red-500 to-red-600 text-white border-red-600';
     }
     
     switch (status) {
