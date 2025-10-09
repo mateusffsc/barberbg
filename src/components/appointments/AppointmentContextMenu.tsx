@@ -78,7 +78,9 @@ export const AppointmentContextMenu: React.FC<AppointmentContextMenuProps> = ({
           {event.resource.client}
         </div>
         <div className="text-xs text-gray-500">
-          {event.resource.services.join(', ')}
+          {event.resource.services ? event.resource.services.join(', ') : 
+           event.resource.isBlock ? (event.resource.blockData?.reason || 'Período Bloqueado') : 
+           'Sem serviços'}
         </div>
         <div className="text-xs text-gray-500">
           {event.start.toLocaleString('pt-BR')}

@@ -661,7 +661,8 @@ export const Appointments: React.FC = () => {
                 Bloquear
               </button>
 
-              {getTodayScheduledCount() > 0 && (
+              {/* Botão de concluir todos removido conforme solicitado */}
+              {false && getTodayScheduledCount() > 0 && (
                 <button
                   onClick={handleCompleteAllToday}
                   disabled={completingAll || isLoading}
