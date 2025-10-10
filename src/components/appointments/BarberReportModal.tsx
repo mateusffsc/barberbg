@@ -210,13 +210,14 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
 
       setRecentAppointments(formattedAppointments);
 
-      // Buscar vendas de produtos do período
+      // Buscar vendas de produtos do período (incluindo vendas vinculadas a agendamentos)
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
         .select(`
           id,
           total_amount,
           sale_datetime,
+          appointment_id,
           sale_products(
             quantity,
             price_at_sale,
@@ -277,19 +278,56 @@ export const BarberReportModal: React.FC<BarberReportModalProps> = ({
           return sum + adjustedCommission;
         }, 0);
         
-        transactions.push({
-          id: `apt-${apt.id}`,
-          date: apt.appointment_datetime,
-          type: 'appointment',
-          client_name: apt.client.name,
-          items: apt.services.map(s => s.name),
-          total_value: (apt.final_amount || apt.total_price),
-          commission_value: serviceCommissions
-        });
+        // Verificar se há produtos vendidos neste agendamento
+        const appointmentSale = formattedSales.find(sale => sale.appointment_id === apt.id);
+        
+        if (appointmentSale) {
+          // Separar em duas transações: serviços e produtos
+          
+          // Transação de serviços
+          transactions.push({
+            id: `apt-service-${apt.id}`,
+            date: apt.appointment_datetime,
+            type: 'appointment',
+            client_name: apt.client.name,
+            items: apt.services.map(s => s.name),
+            total_value: (apt.final_amount || apt.total_price),
+            commission_value: serviceCommissions
+          });
+          
+          // Transação de produtos
+          const productCommission = appointmentSale.sale_products?.reduce((sum: number, sp: any) => {
+            return sum + (sp.price_at_sale * sp.quantity * sp.commission_rate_applied);
+          }, 0) || 0;
+          
+          transactions.push({
+            id: `apt-product-${apt.id}`,
+            date: apt.appointment_datetime,
+            type: 'sale',
+            client_name: apt.client.name,
+            items: appointmentSale.products.map(p => `${p.name} (${p.quantity}x)`),
+            total_value: appointmentSale.total_amount,
+            commission_value: productCommission
+          });
+        } else {
+          // Apenas serviços
+          transactions.push({
+            id: `apt-${apt.id}`,
+            date: apt.appointment_datetime,
+            type: 'appointment',
+            client_name: apt.client.name,
+            items: apt.services.map(s => s.name),
+            total_value: (apt.final_amount || apt.total_price),
+            commission_value: serviceCommissions
+          });
+        }
       });
       
-      // Adicionar vendas
+      // Adicionar vendas independentes (não vinculadas a agendamentos)
       formattedSales.forEach(sale => {
+        // Pular vendas que já foram processadas como parte de agendamentos
+        if (sale.appointment_id) return;
+        
         const saleCommission = sale.sale_products?.reduce((sum: number, sp: any) => {
           return sum + (sp.price_at_sale * sp.quantity * sp.commission_rate_applied);
         }, 0) || 0;

@@ -4,6 +4,8 @@ import { formatCurrency, parseCurrency, formatCurrencyInputFlexible } from '../.
 import { PaymentMethod, PAYMENT_METHODS, MultiplePaymentInfo } from '../../types/payment';
 import { Product } from '../../types/product';
 import { useProducts } from '../../hooks/useProducts';
+import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean;
@@ -12,6 +14,9 @@ interface PaymentConfirmationModalProps {
   title: string;
   originalAmount: number;
   loading?: boolean;
+  appointmentId?: number; // Novo prop para identificar o agendamento
+  barberId?: number; // Novo prop para identificar o barbeiro
+  clientId?: number; // Novo prop para identificar o cliente
 }
 
 export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> = ({
@@ -20,7 +25,10 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   onConfirm,
   title,
   originalAmount,
-  loading: externalLoading = false
+  loading: externalLoading = false,
+  appointmentId,
+  barberId,
+  clientId
 }) => {
   // Todos os hooks devem estar no topo, sempre na mesma ordem
   const [payments, setPayments] = useState<MultiplePaymentInfo[]>([]);
@@ -36,6 +44,15 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   
   // Hook sempre chamado, independente de condições
   const { fetchProducts } = useProducts();
+
+  // Calcular valores numéricos
+  const numericFinalAmount = parseCurrency(finalAmount);
+  const productsTotal = selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const totalValue = originalAmount + productsTotal;
+  const hasValueChanged = Math.abs(numericFinalAmount - totalValue) > 0.01;
+  const totalPayments = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const remainingAmount = totalValue - totalPayments;
+  const isPaymentComplete = Math.abs(remainingAmount) < 0.01;
 
   // Carregar produtos disponíveis
   const loadProducts = async () => {
@@ -63,20 +80,17 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
     }
   }, [isOpen, originalAmount]);
 
-  // Atualizar valor final quando produtos mudarem
+  // Atualizar final_amount e pagamentos quando produtos mudarem
   useEffect(() => {
-    if (selectedProducts.length > 0) {
-      const productsTotal = selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-      const newTotal = originalAmount + productsTotal;
-      setFinalAmount(newTotal.toFixed(2));
-      setPayments([{ method: 'money', amount: newTotal }]);
-      setPaymentDisplayValues([newTotal.toFixed(2).replace('.', ',')]);
-    } else {
-      // Se não há produtos, voltar ao valor original
-      setFinalAmount(originalAmount.toFixed(2));
-      setPayments([{ method: 'money', amount: originalAmount }]);
-      setPaymentDisplayValues([originalAmount.toFixed(2).replace('.', ',')]);
-    }
+    const productsTotal = selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const totalToPay = originalAmount + productsTotal;
+    
+    // Atualizar o final_amount para incluir produtos
+    setFinalAmount(totalToPay.toFixed(2));
+    
+    // Atualizar os pagamentos para incluir o valor total (serviço + produtos)
+    setPayments([{ method: 'money', amount: totalToPay }]);
+    setPaymentDisplayValues([totalToPay.toFixed(2).replace('.', ',')]);
   }, [selectedProducts, originalAmount]);
 
   if (!isOpen) return null;
@@ -86,12 +100,84 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
 
     setLoading(true);
     try {
-      await onConfirm(payments, numericFinalAmount, selectedProducts.length > 0 ? selectedProducts : undefined);
+      // Se há produtos selecionados, registrar venda separada
+      if (selectedProducts.length > 0 && appointmentId && barberId) {
+        await registerProductSale(appointmentId, selectedProducts, payments[0].method);
+      }
+
+      // Chamar onConfirm apenas com o valor do serviço (sem produtos)
+      await onConfirm(payments, originalAmount, undefined);
       onClose();
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
+      toast.error('Erro ao processar pagamento');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Função para registrar venda de produtos separadamente
+  const registerProductSale = async (appointmentId: number, soldProducts: { product: Product; quantity: number }[], paymentMethod: PaymentMethod) => {
+    try {
+      // Calcular total da venda de produtos
+      const total = soldProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+
+      // Buscar dados do barbeiro para obter taxa de comissão
+      const { data: barberData, error: barberError } = await supabase
+        .from('barbers')
+        .select('commission_rate_product')
+        .eq('id', barberId)
+        .single();
+
+      if (barberError) throw barberError;
+
+      // Criar registro de venda
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          client_id: clientId,
+          barber_id: barberId,
+          sale_datetime: new Date().toISOString(),
+          total_amount: total,
+          payment_method: paymentMethod,
+          appointment_id: appointmentId
+        })
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      // Registrar produtos vendidos e atualizar estoque
+      for (const item of soldProducts) {
+        // Inserir item vendido
+        const { error: itemError } = await supabase
+          .from('sale_products')
+          .insert({
+            sale_id: sale.id,
+            product_id: item.product.id,
+            quantity: item.quantity,
+            price_at_sale: item.product.price,
+            commission_rate_applied: barberData.commission_rate_product || 0
+          });
+
+        if (itemError) throw itemError;
+
+        // Atualizar estoque
+        const { error: stockError } = await supabase
+          .from('products')
+          .update({ 
+            stock_quantity: item.product.stock_quantity - item.quantity 
+          })
+          .eq('id', item.product.id);
+
+        if (stockError) throw stockError;
+      }
+
+      console.log('Venda de produtos registrada separadamente:', sale.id);
+      toast.success(`Venda de ${soldProducts.length} produto(s) registrada com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao registrar venda de produtos:', error);
+      throw error;
     }
   };
 
@@ -169,13 +255,9 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   };
 
   const updateFinalAmountWithProducts = () => {
-    const productsTotal = selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const newTotal = originalAmount + productsTotal;
-    setFinalAmount(newTotal.toFixed(2));
-    
-    // Atualizar pagamentos para refletir o novo total
-    setPayments([{ method: 'money', amount: newTotal }]);
-    setPaymentDisplayValues([newTotal.toFixed(2).replace('.', ',')]);
+    // Esta função não deve mais incluir produtos no final_amount
+    // O final_amount deve ser apenas do serviço
+    // Os produtos são tratados separadamente
   };
 
   const filteredProducts = availableProducts.filter(product =>
@@ -219,14 +301,6 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
     
     setFinalAmount(value);
   };
-
-
-
-  const numericFinalAmount = parseCurrency(finalAmount);
-  const hasValueChanged = Math.abs(numericFinalAmount - originalAmount) > 0.01;
-  const totalPayments = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const remainingAmount = numericFinalAmount - totalPayments;
-  const isPaymentComplete = Math.abs(remainingAmount) < 0.01;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -486,23 +560,33 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
             {/* Payment Summary */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Valor total:</span>
-                  <span className="font-medium">{formatCurrency(numericFinalAmount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total pago:</span>
-                  <span className="font-medium">{formatCurrency(totalPayments)}</span>
-                </div>
-                <div className="flex justify-between border-t border-gray-300 pt-2">
-                  <span className={`font-medium ${remainingAmount > 0 ? 'text-red-600' : remainingAmount < 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    {remainingAmount > 0 ? 'Restante:' : remainingAmount < 0 ? 'Excesso:' : 'Completo:'}
-                  </span>
-                  <span className={`font-medium ${remainingAmount > 0 ? 'text-red-600' : remainingAmount < 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    {formatCurrency(Math.abs(remainingAmount))}
-                  </span>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Valor do serviço:</span>
+                <span className="font-medium">{formatCurrency(originalAmount)}</span>
               </div>
+              {selectedProducts.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Valor dos produtos:</span>
+                  <span className="font-medium">{formatCurrency(selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0))}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-gray-300 pt-2">
+                <span className="text-gray-600">Valor total:</span>
+                <span className="font-medium">{formatCurrency(originalAmount + selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total pago:</span>
+                <span className="font-medium">{formatCurrency(totalPayments)}</span>
+              </div>
+              <div className="flex justify-between border-t border-gray-300 pt-2">
+                <span className={`font-medium ${remainingAmount > 0 ? 'text-red-600' : remainingAmount < 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  {remainingAmount > 0 ? 'Restante:' : remainingAmount < 0 ? 'Excesso:' : 'Completo:'}
+                </span>
+                <span className={`font-medium ${remainingAmount > 0 ? 'text-red-600' : remainingAmount < 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  {formatCurrency(Math.abs(remainingAmount))}
+                </span>
+              </div>
+            </div>
             </div>
 
             {!isPaymentComplete && (

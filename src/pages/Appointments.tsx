@@ -426,27 +426,81 @@ export const Appointments: React.FC = () => {
     }
   };
 
+  // Função para registrar venda de produtos
+  const registerProductSale = async (appointmentId: number, soldProducts: { product: Product; quantity: number }[], paymentMethod?: PaymentMethod) => {
+    try {
+      // Buscar dados do agendamento para obter barbeiro e cliente
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .select('barber_id, client_id, barbers(commission_rate_product)')
+        .eq('id', appointmentId)
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Calcular total da venda de produtos
+      const total = soldProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+
+      // Criar registro de venda
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          client_id: appointment.client_id,
+          barber_id: appointment.barber_id,
+          sale_datetime: new Date().toISOString(),
+          total_amount: total,
+          payment_method: paymentMethod || 'money',
+          appointment_id: appointmentId
+        })
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      // Registrar produtos vendidos e atualizar estoque
+      for (const item of soldProducts) {
+        // Inserir item vendido
+        const { error: itemError } = await supabase
+          .from('sale_products')
+          .insert({
+            sale_id: sale.id,
+            product_id: item.product.id,
+            quantity: item.quantity,
+            price_at_sale: item.product.price,
+            commission_rate_applied: appointment.barbers?.commission_rate_product || 0
+          });
+
+        if (itemError) throw itemError;
+
+        // Atualizar estoque
+        const { error: stockError } = await supabase
+          .from('products')
+          .update({ 
+            stock_quantity: item.product.stock_quantity - item.quantity 
+          })
+          .eq('id', item.product.id);
+
+        if (stockError) throw stockError;
+      }
+
+      console.log('Venda de produtos registrada com sucesso:', sale.id);
+    } catch (error) {
+      console.error('Erro ao registrar venda de produtos:', error);
+      throw error;
+    }
+  };
+
   const handleStatusChange = async (appointmentId: number, status: string, paymentMethod?: PaymentMethod, finalAmount?: number, soldProducts?: { product: Product; quantity: number }[]) => {
     try {
       await updateAppointmentStatus(appointmentId, status, paymentMethod, finalAmount);
       
-      // Se há produtos vendidos, registrar a venda
-      if (soldProducts && soldProducts.length > 0) {
-        console.log('Produtos vendidos:', soldProducts);
-        // TODO: Implementar lógica para registrar venda de produtos
-        // Isso pode incluir:
-        // - Criar registro de venda
-        // - Atualizar estoque dos produtos
-        // - Registrar comissões se aplicável
-      }
+      // Nota: O registro de produtos vendidos agora é feito automaticamente pelo PaymentConfirmationModal
+      // quando há produtos selecionados durante a finalização do agendamento
       
       await reloadAppointmentsWithFilters();
       
       if (status === 'completed') {
-        const productMessage = soldProducts && soldProducts.length > 0 
-          ? ` e ${soldProducts.length} produto(s) vendido(s)`
-          : '';
-        toast.success(`Agendamento finalizado com sucesso${productMessage}!`);
+        toast.success('Agendamento finalizado com sucesso!');
       } else if (status === 'cancelled') {
         toast.success('Agendamento cancelado');
       } else {

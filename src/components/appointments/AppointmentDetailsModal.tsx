@@ -828,6 +828,9 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         title="Finalizar Agendamento"
         originalAmount={event.resource.appointment.total_price}
         loading={updating}
+        appointmentId={event.resource.appointment.id}
+        barberId={event.resource.appointment.barber_id}
+        clientId={event.resource.appointment.client_id}
       />
 
       {/* Modal de Confirmação de Exclusão */}
