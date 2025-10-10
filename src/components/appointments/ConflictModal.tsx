@@ -24,14 +24,14 @@ interface ConflictModalProps {
       appointment_datetime: string;
       client_name: string;
       barber_name: string;
-      service_names: string;
+      services_names: string;
       duration_minutes: number;
     }>;
     newAppointment: {
       appointment_datetime: string;
       client_name: string;
       barber_name: string;
-      service_names: string;
+      services_names: string;
       duration_minutes: number;
     };
   } | null;
