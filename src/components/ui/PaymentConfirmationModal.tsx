@@ -48,11 +48,20 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   // Calcular valores numéricos
   const numericFinalAmount = parseCurrency(finalAmount);
   const productsTotal = selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-  const totalValue = originalAmount + productsTotal;
-  const hasValueChanged = Math.abs(numericFinalAmount - totalValue) > 0.01;
+  
+  // Se o valor final foi alterado, usar ele como base para o serviço
+  // Caso contrário, usar o valor original
+  const serviceAmount = numericFinalAmount > 0 ? numericFinalAmount : originalAmount;
+  const totalValue = serviceAmount + productsTotal;
+  const hasValueChanged = Math.abs(serviceAmount - originalAmount) > 0.01;
   const totalPayments = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const remainingAmount = totalValue - totalPayments;
-  const isPaymentComplete = Math.abs(remainingAmount) < 0.01;
+  
+  // Permitir finalizar se:
+  // 1. O pagamento está completo (valor exato)
+  // 2. O valor pago é menor que o total (desconto aplicado)
+  // Não permitir apenas se o valor pago for maior que o total
+  const isPaymentComplete = remainingAmount <= 0.01;
 
   // Carregar produtos disponíveis
   const loadProducts = async () => {
@@ -83,15 +92,13 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   // Atualizar final_amount e pagamentos quando produtos mudarem
   useEffect(() => {
     const productsTotal = selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const totalToPay = originalAmount + productsTotal;
-    
-    // Atualizar o final_amount para incluir produtos
-    setFinalAmount(totalToPay.toFixed(2));
+    const currentServiceAmount = numericFinalAmount > 0 ? numericFinalAmount : originalAmount;
+    const totalToPay = currentServiceAmount + productsTotal;
     
     // Atualizar os pagamentos para incluir o valor total (serviço + produtos)
     setPayments([{ method: 'money', amount: totalToPay }]);
     setPaymentDisplayValues([totalToPay.toFixed(2).replace('.', ',')]);
-  }, [selectedProducts, originalAmount]);
+  }, [selectedProducts, originalAmount, numericFinalAmount]);
 
   if (!isOpen) return null;
 
@@ -100,13 +107,16 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
 
     setLoading(true);
     try {
+      // Calcular desconto aplicado (se houver)
+      const discountApplied = remainingAmount < -0.01 ? Math.abs(remainingAmount) : 0;
+      
       // Se há produtos selecionados, registrar venda separada
       if (selectedProducts.length > 0 && appointmentId && barberId) {
         await registerProductSale(appointmentId, selectedProducts, payments[0].method);
       }
 
-      // Chamar onConfirm apenas com o valor do serviço (sem produtos)
-      await onConfirm(payments, originalAmount, undefined);
+      // Chamar onConfirm com o valor do serviço atualizado (considerando alteração)
+      await onConfirm(payments, serviceAmount, discountApplied > 0 ? discountApplied : undefined);
       onClose();
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
@@ -562,7 +572,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
               <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Valor do serviço:</span>
-                <span className="font-medium">{formatCurrency(originalAmount)}</span>
+                <span className="font-medium">{formatCurrency(serviceAmount)}</span>
               </div>
               {selectedProducts.length > 0 && (
                 <div className="flex justify-between">
@@ -572,24 +582,24 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
               )}
               <div className="flex justify-between border-t border-gray-300 pt-2">
                 <span className="text-gray-600">Valor total:</span>
-                <span className="font-medium">{formatCurrency(originalAmount + selectedProducts.reduce((sum, item) => sum + (item.product.price * item.quantity), 0))}</span>
+                <span className="font-medium">{formatCurrency(totalValue)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Total pago:</span>
                 <span className="font-medium">{formatCurrency(totalPayments)}</span>
               </div>
               <div className="flex justify-between border-t border-gray-300 pt-2">
-                <span className={`font-medium ${remainingAmount > 0 ? 'text-red-600' : remainingAmount < 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                  {remainingAmount > 0 ? 'Restante:' : remainingAmount < 0 ? 'Excesso:' : 'Completo:'}
+                <span className={`font-medium ${remainingAmount > 0.01 ? 'text-red-600' : remainingAmount < -0.01 ? 'text-green-600' : 'text-green-600'}`}>
+                  {remainingAmount > 0.01 ? 'Restante:' : remainingAmount < -0.01 ? 'Desconto aplicado:' : 'Completo:'}
                 </span>
-                <span className={`font-medium ${remainingAmount > 0 ? 'text-red-600' : remainingAmount < 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                  {formatCurrency(Math.abs(remainingAmount))}
+                <span className={`font-medium ${remainingAmount > 0.01 ? 'text-red-600' : remainingAmount < -0.01 ? 'text-green-600' : 'text-green-600'}`}>
+                  {remainingAmount > 0.01 ? formatCurrency(remainingAmount) : remainingAmount < -0.01 ? formatCurrency(Math.abs(remainingAmount)) : formatCurrency(0)}
                 </span>
               </div>
             </div>
             </div>
 
-            {!isPaymentComplete && (
+            {remainingAmount > 0.01 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                 <div className="flex items-center space-x-2">
                   <div className="text-yellow-600">
@@ -598,7 +608,22 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
                     </svg>
                   </div>
                   <div className="text-sm text-yellow-800">
-                    <strong>Atenção:</strong> O valor total dos pagamentos deve ser igual ao valor final.
+                    <strong>Atenção:</strong> Ainda falta {formatCurrency(remainingAmount)} para completar o pagamento.
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {remainingAmount < -0.01 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <div className="text-green-600">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="text-sm text-green-800">
+                    <strong>Desconto aplicado:</strong> {formatCurrency(Math.abs(remainingAmount))} de desconto concedido ao cliente.
                   </div>
                 </div>
               </div>
