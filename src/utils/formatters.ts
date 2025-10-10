@@ -70,3 +70,36 @@ export const formatCurrencyInput = (value: string): string => {
     currency: 'BRL'
   }).format(amount);
 };
+
+export const formatCurrencyInputFlexible = (value: string): string => {
+  let cleanValue = value;
+  
+  // Permitir apenas números, vírgula e ponto
+  cleanValue = cleanValue.replace(/[^\d,\.]/g, '');
+  
+  // Se contém vírgula, garantir que só há uma
+  if (cleanValue.includes(',')) {
+    const parts = cleanValue.split(',');
+    if (parts.length > 2) {
+      cleanValue = parts[0] + ',' + parts.slice(1).join('');
+    }
+    
+    // Limitar casas decimais após a vírgula
+    if (parts[1] && parts[1].length > 2) {
+      cleanValue = parts[0] + ',' + parts[1].substring(0, 2);
+    }
+  } else if (cleanValue.includes('.')) {
+    // Se há ponto, garantir que só há um
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) {
+      cleanValue = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limitar casas decimais após o ponto
+    if (parts[1] && parts[1].length > 2) {
+      cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+  }
+  
+  return cleanValue;
+};

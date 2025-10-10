@@ -539,10 +539,19 @@ export const Appointments: React.FC = () => {
 
   const handleBlockSchedule = async (blockData: any) => {
     try {
-      await createScheduleBlock(blockData);
+      await createScheduleBlock(
+        blockData.date,
+        blockData.startTime,
+        blockData.endTime,
+        blockData.reason,
+        blockData.barberId,
+        blockData.isRecurring,
+        blockData.recurrenceType,
+        blockData.recurrencePattern,
+        blockData.recurrenceEndDate
+      );
       await reloadAppointmentsWithFilters();
       setShowBlockModal(false);
-      toast.success('Horário bloqueado com sucesso!');
     } catch (error) {
       console.error('Erro ao bloquear horário:', error);
       toast.error('Erro ao bloquear horário');

@@ -607,6 +607,10 @@ export const useAppointments = () => {
     endTime: string;
     reason?: string;
     barberId?: number;
+    isRecurring?: boolean;
+    recurrenceType?: 'daily' | 'weekly' | 'monthly';
+    recurrencePattern?: any;
+    recurrenceEndDate?: string;
   }): Promise<boolean> => {
     try {
       let finalBarberId = blockData.barberId;
@@ -634,20 +638,38 @@ export const useAppointments = () => {
         return false;
       }
 
+      // Validar dados de recorrência
+      if (blockData.isRecurring) {
+        if (!blockData.recurrenceType || !blockData.recurrencePattern || !blockData.recurrenceEndDate) {
+          toast.error('Dados de recorrência incompletos');
+          return false;
+        }
+      }
+
+      const insertData: any = {
+        barber_id: finalBarberId,
+        block_date: blockData.date,
+        start_time: blockData.startTime,
+        end_time: blockData.endTime,
+        reason: blockData.reason || null,
+        created_by: user?.id || null,
+        is_recurring: blockData.isRecurring || false,
+        recurrence_type: blockData.recurrenceType || null,
+        recurrence_pattern: blockData.recurrencePattern || null,
+        recurrence_end_date: blockData.recurrenceEndDate || null
+      };
+
       const { error } = await supabase
         .from('schedule_blocks')
-        .insert({
-          barber_id: finalBarberId,
-          block_date: blockData.date,
-          start_time: blockData.startTime,
-          end_time: blockData.endTime,
-          reason: blockData.reason || null,
-          created_by: user?.id || null
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
-      toast.success('Período bloqueado com sucesso!');
+      if (blockData.isRecurring) {
+        toast.success('Bloqueio recorrente criado com sucesso!');
+      } else {
+        toast.success('Período bloqueado com sucesso!');
+      }
       return true;
     } catch (error: any) {
       console.error('Erro ao criar bloqueio:', error);
@@ -974,16 +996,68 @@ export const useAppointments = () => {
     return [...appointmentEvents, ...blockEvents];
   };
 
-  const deleteScheduleBlock = async (blockId: number): Promise<boolean> => {
+  const deleteScheduleBlock = async (blockId: number, deleteRecurringOptions?: {
+    deleteType: 'single' | 'future' | 'all';
+  }): Promise<boolean> => {
     try {
-      const { error } = await supabase
+      // Se não especificou opções de recorrência, deletar apenas o bloqueio único
+      if (!deleteRecurringOptions) {
+        const { error } = await supabase
+          .from('schedule_blocks')
+          .delete()
+          .eq('id', blockId);
+
+        if (error) throw error;
+        toast.success('Bloqueio excluído com sucesso!');
+        return true;
+      }
+
+      // Buscar informações do bloqueio para verificar se é recorrente
+      const { data: blockInfo, error: fetchError } = await supabase
         .from('schedule_blocks')
-        .delete()
-        .eq('id', blockId);
+        .select('is_recurring, parent_block_id')
+        .eq('id', blockId)
+        .single();
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
-      toast.success('Bloqueio excluído com sucesso!');
+      const { deleteType } = deleteRecurringOptions;
+
+      if (deleteType === 'single') {
+        // Deletar apenas este bloqueio específico
+        const { error } = await supabase
+          .from('schedule_blocks')
+          .delete()
+          .eq('id', blockId);
+
+        if (error) throw error;
+        toast.success('Bloqueio excluído com sucesso!');
+      } else if (deleteType === 'future') {
+        // Deletar bloqueios futuros da série
+        const parentId = blockInfo.parent_block_id || blockId;
+        
+        const { error } = await supabase
+          .rpc('delete_recurring_blocks', {
+            p_parent_block_id: parentId,
+            p_delete_future_only: true
+          });
+
+        if (error) throw error;
+        toast.success('Bloqueios futuros excluídos com sucesso!');
+      } else if (deleteType === 'all') {
+        // Deletar toda a série de bloqueios
+        const parentId = blockInfo.parent_block_id || blockId;
+        
+        const { error } = await supabase
+          .rpc('delete_recurring_blocks', {
+            p_parent_block_id: parentId,
+            p_delete_future_only: false
+          });
+
+        if (error) throw error;
+        toast.success('Série de bloqueios excluída com sucesso!');
+      }
+
       return true;
     } catch (error: any) {
       console.error('Erro ao excluir bloqueio:', error);

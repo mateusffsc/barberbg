@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, Plus, Trash2, Package, ShoppingCart } from 'lucide-react';
-import { formatCurrency, parseCurrency } from '../../utils/formatters';
+import { X, DollarSign, Plus, Trash2, ShoppingCart, Package } from 'lucide-react';
+import { formatCurrency, parseCurrency, formatCurrencyInputFlexible } from '../../utils/formatters';
 import { PaymentMethod, PAYMENT_METHODS, MultiplePaymentInfo } from '../../types/payment';
 import { Product } from '../../types/product';
 import { useProducts } from '../../hooks/useProducts';
@@ -25,6 +25,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   // Todos os hooks devem estar no topo, sempre na mesma ordem
   const [payments, setPayments] = useState<MultiplePaymentInfo[]>([]);
   const [finalAmount, setFinalAmount] = useState<string>('');
+  const [paymentDisplayValues, setPaymentDisplayValues] = useState<string[]>([]);
   const [showCustomAmount, setShowCustomAmount] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -53,6 +54,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
     if (isOpen) {
       setFinalAmount(originalAmount.toFixed(2));
       setPayments([{ method: 'money', amount: originalAmount }]);
+      setPaymentDisplayValues([originalAmount.toFixed(2).replace('.', ',')]);
       setShowCustomAmount(false);
       setShowProducts(false);
       setSelectedProducts([]);
@@ -68,10 +70,12 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
       const newTotal = originalAmount + productsTotal;
       setFinalAmount(newTotal.toFixed(2));
       setPayments([{ method: 'money', amount: newTotal }]);
+      setPaymentDisplayValues([newTotal.toFixed(2).replace('.', ',')]);
     } else {
       // Se não há produtos, voltar ao valor original
       setFinalAmount(originalAmount.toFixed(2));
       setPayments([{ method: 'money', amount: originalAmount }]);
+      setPaymentDisplayValues([originalAmount.toFixed(2).replace('.', ',')]);
     }
   }, [selectedProducts, originalAmount]);
 
@@ -95,12 +99,14 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
     const remainingAmount = parseCurrency(finalAmount) - payments.reduce((sum, p) => sum + p.amount, 0);
     if (remainingAmount > 0) {
       setPayments([...payments, { method: 'money', amount: remainingAmount }]);
+      setPaymentDisplayValues([...paymentDisplayValues, remainingAmount.toFixed(2).replace('.', ',')]);
     }
   };
 
   const removePayment = (index: number) => {
     if (payments.length > 1) {
       setPayments(payments.filter((_, i) => i !== index));
+      setPaymentDisplayValues(paymentDisplayValues.filter((_, i) => i !== index));
     }
   };
 
@@ -111,10 +117,18 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
   };
 
   const updatePaymentAmount = (index: number, value: string) => {
-    const amount = parseCurrency(value) || 0;
+    const formattedValue = formatCurrencyInputFlexible(value);
+    const amount = parseCurrency(formattedValue) || 0;
+    
+    // Atualizar o valor numérico
     const updatedPayments = [...payments];
     updatedPayments[index].amount = amount;
     setPayments(updatedPayments);
+    
+    // Atualizar o valor de exibição
+    const updatedDisplayValues = [...paymentDisplayValues];
+    updatedDisplayValues[index] = formattedValue;
+    setPaymentDisplayValues(updatedDisplayValues);
   };
 
   // Funções para produtos
@@ -161,6 +175,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
     
     // Atualizar pagamentos para refletir o novo total
     setPayments([{ method: 'money', amount: newTotal }]);
+    setPaymentDisplayValues([newTotal.toFixed(2).replace('.', ',')]);
   };
 
   const filteredProducts = availableProducts.filter(product =>
@@ -459,7 +474,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
                   </div>
                   <input
                     type="text"
-                    value={payment.amount.toFixed(2).replace('.', ',')}
+                    value={paymentDisplayValues[index] || ''}
                     onChange={(e) => updatePaymentAmount(index, e.target.value)}
                     placeholder="0,00"
                     className="block w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"

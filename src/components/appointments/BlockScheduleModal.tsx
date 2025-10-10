@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, Calendar, Clock, User } from 'lucide-react';
+import { X, Lock, Calendar, Clock, User, Repeat } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBarbers } from '../../hooks/useBarbers';
@@ -16,6 +16,10 @@ interface BlockData {
   end_time: string;
   reason?: string;
   barber_id?: number;
+  isRecurring?: boolean;
+  recurrenceType?: 'daily' | 'weekly' | 'monthly';
+  recurrencePattern?: any;
+  recurrenceEndDate?: string;
 }
 
 export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
@@ -31,7 +35,11 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
     start_time: '09:00',
     end_time: '10:00',
     reason: '',
-    barber_id: undefined
+    barber_id: undefined,
+    isRecurring: false,
+    recurrenceType: 'daily',
+    recurrencePattern: {},
+    recurrenceEndDate: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -88,19 +96,64 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
       return;
     }
 
+    // Validar campos de recorrência se necessário
+    if (blockData.isRecurring) {
+      if (!blockData.recurrenceEndDate) {
+        toast.error('Selecione a data de fim da recorrência');
+        return;
+      }
+      
+      if (blockData.recurrenceEndDate <= blockData.date) {
+        toast.error('A data de fim deve ser posterior à data de início');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
+      // Preparar padrão de recorrência baseado no tipo
+      let recurrencePattern = {};
+      
+      if (blockData.isRecurring) {
+        switch (blockData.recurrenceType) {
+          case 'daily':
+            recurrencePattern = { interval: 1 };
+            break;
+          case 'weekly':
+            const dayOfWeek = new Date(blockData.date).getDay();
+            recurrencePattern = { 
+              interval: 1, 
+              days_of_week: [dayOfWeek] 
+            };
+            break;
+          case 'monthly':
+            const dayOfMonth = new Date(blockData.date).getDate();
+            recurrencePattern = { 
+              interval: 1, 
+              day_of_month: dayOfMonth 
+            };
+            break;
+        }
+      }
+
       // Converter os dados para o formato esperado pela função createScheduleBlock
       const blockDataFormatted = {
         date: blockData.date,
         startTime: blockData.start_time,
         endTime: blockData.end_time,
         reason: blockData.reason,
-        barberId: blockData.barber_id
+        barberId: blockData.barber_id,
+        isRecurring: blockData.isRecurring,
+        recurrenceType: blockData.recurrenceType,
+        recurrencePattern: recurrencePattern,
+        recurrenceEndDate: blockData.recurrenceEndDate
       };
       
       await onBlock(blockDataFormatted);
-      toast.success('Período bloqueado com sucesso!');
+      const successMessage = blockData.isRecurring 
+        ? 'Bloqueios recorrentes criados com sucesso!' 
+        : 'Período bloqueado com sucesso!';
+      toast.success(successMessage);
       onClose();
       // Reset form
       setBlockData({
@@ -108,7 +161,11 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
         start_time: '09:00',
         end_time: '10:00',
         reason: '',
-        barber_id: user?.role === 'barber' ? blockData.barber_id : undefined
+        barber_id: user?.role === 'barber' ? blockData.barber_id : undefined,
+        isRecurring: false,
+        recurrenceType: 'daily',
+        recurrencePattern: {},
+        recurrenceEndDate: ''
       });
     } catch (error) {
       console.error('Erro ao bloquear período:', error);
@@ -248,6 +305,76 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
                 />
               </div>
 
+              {/* Opção de Recorrência */}
+              <div className="border-t pt-4">
+                <div className="flex items-center mb-4">
+                  <input
+                    type="checkbox"
+                    id="isRecurring"
+                    checked={blockData.isRecurring}
+                    onChange={(e) => handleInputChange('isRecurring', e.target.checked)}
+                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isRecurring" className="ml-2 block text-sm font-medium text-gray-700">
+                    <Repeat className="h-4 w-4 inline mr-1" />
+                    Bloqueio recorrente
+                  </label>
+                </div>
+
+                {blockData.isRecurring && (
+                  <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+                    {/* Tipo de Recorrência */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Repetir
+                      </label>
+                      <select
+                        value={blockData.recurrenceType}
+                        onChange={(e) => handleInputChange('recurrenceType', e.target.value as 'daily' | 'weekly' | 'monthly')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      >
+                        <option value="daily">Diariamente</option>
+                        <option value="weekly">Semanalmente</option>
+                        <option value="monthly">Mensalmente</option>
+                      </select>
+                    </div>
+
+                    {/* Data de Fim da Recorrência */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <Calendar className="h-4 w-4 inline mr-1" />
+                        Repetir até *
+                      </label>
+                      <input
+                        type="date"
+                        value={blockData.recurrenceEndDate}
+                        onChange={(e) => handleInputChange('recurrenceEndDate', e.target.value)}
+                        min={blockData.date}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        required={blockData.isRecurring}
+                      />
+                    </div>
+
+                    {/* Informação sobre a recorrência */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex">
+                        <Repeat className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                        <div className="ml-3">
+                          <h4 className="text-sm font-medium text-blue-800">
+                            Sobre bloqueios recorrentes
+                          </h4>
+                          <p className="text-sm text-blue-700 mt-1">
+                            {blockData.recurrenceType === 'daily' && 'Será criado um bloqueio todos os dias no mesmo horário.'}
+                            {blockData.recurrenceType === 'weekly' && `Será criado um bloqueio toda ${['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][new Date(blockData.date).getDay()]} no mesmo horário.`}
+                            {blockData.recurrenceType === 'monthly' && `Será criado um bloqueio todo dia ${new Date(blockData.date).getDate()} de cada mês no mesmo horário.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Informação sobre o bloqueio */}
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <div className="flex">
@@ -274,7 +401,7 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
               className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Lock className="h-4 w-4 mr-2" />
-              {loading ? 'Bloqueando...' : 'Bloquear Período'}
+              {loading ? 'Bloqueando...' : blockData.isRecurring ? 'Criar Bloqueios Recorrentes' : 'Bloquear Período'}
             </button>
             <button
               type="button"

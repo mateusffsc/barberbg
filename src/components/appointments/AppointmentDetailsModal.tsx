@@ -10,6 +10,7 @@ import { Service } from '../../types/service';
 import { Product } from '../../types/product';
 import toast from 'react-hot-toast';
 import RecurrenceActionModal from './RecurrenceActionModal';
+import { DeleteRecurringBlockModal } from './DeleteRecurringBlockModal';
 
 interface AppointmentDetailsModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ interface AppointmentDetailsModalProps {
   event: CalendarEvent | null;
   onStatusChange?: (appointmentId: number, newStatus: string, paymentMethod?: PaymentMethod, finalAmount?: number, soldProducts?: { product: Product; quantity: number }[]) => Promise<void>;
   onUpdateAppointment?: (appointmentId: number, updateData: any) => Promise<void>;
-  onDeleteBlock?: (blockId: number) => Promise<void>;
+  onDeleteBlock?: (blockId: number, deleteRecurringOptions?: { deleteType: 'single' | 'future' | 'all' }) => Promise<void>;
   onDeleteAppointment?: (appointmentId: number) => Promise<void>;
   onDeleteRecurringAppointments?: (recurrenceGroupId: string) => Promise<void>;
   onUpdateRecurringAppointments?: (recurrenceGroupId: string, updateData: any) => Promise<void>;
@@ -46,6 +47,8 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
+  const [showDeleteBlockModal, setShowDeleteBlockModal] = useState(false);
+  const [deleteBlockLoading, setDeleteBlockLoading] = useState(false);
   const [recurrenceAction, setRecurrenceAction] = useState<'edit' | 'delete'>('delete');
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
@@ -93,6 +96,13 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       return;
     }
     
+    // Verificar se é um bloqueio recorrente
+    if (event.resource.blockData.is_recurring) {
+      setShowDeleteConfirmation(false);
+      setShowDeleteBlockModal(true);
+      return;
+    }
+    
     try {
       console.log('🗑️ Chamando onDeleteBlock com ID:', event.resource.blockData.id);
       await onDeleteBlock(event.resource.blockData.id);
@@ -101,6 +111,21 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       console.log('✅ Modal de confirmação fechado');
     } catch (error) {
       console.error('❌ Erro ao excluir bloqueio:', error);
+    }
+  };
+
+  const handleDeleteRecurringBlock = async (deleteType: 'single' | 'future' | 'all') => {
+    if (!event?.resource.blockData?.id || !onDeleteBlock) return;
+    
+    setDeleteBlockLoading(true);
+    try {
+      await onDeleteBlock(event.resource.blockData.id, { deleteType });
+      setShowDeleteBlockModal(false);
+      onClose();
+    } catch (error) {
+      console.error('❌ Erro ao excluir bloqueio recorrente:', error);
+    } finally {
+      setDeleteBlockLoading(false);
     }
   };
 
@@ -848,6 +873,21 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         onAllAction={() => handleRecurrenceAction('all')}
         actionType={recurrenceAction}
         appointmentDate={event?.start ? new Date(event.start).toLocaleDateString('pt-BR') : ''}
+      />
+
+      {/* Modal de Exclusão de Bloqueio Recorrente */}
+      <DeleteRecurringBlockModal
+        isOpen={showDeleteBlockModal}
+        onClose={() => setShowDeleteBlockModal(false)}
+        onDelete={handleDeleteRecurringBlock}
+        blockInfo={{
+          date: event?.start ? event.start.toISOString().split('T')[0] : '',
+          startTime: event?.start ? event.start.toTimeString().substring(0, 5) : '',
+          endTime: event?.end ? event.end.toTimeString().substring(0, 5) : '',
+          reason: event?.resource?.blockData?.reason || '',
+          isRecurring: event?.resource?.blockData?.is_recurring || false
+        }}
+        loading={deleteBlockLoading}
       />
     </div>
   );
