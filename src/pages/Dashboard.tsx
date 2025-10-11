@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
   
   const periods = {
     today: { label: 'Hoje', days: 0 },
-    week: { label: 'Esta Semana', days: 7 },
+    week: { label: 'Semanal (Domingo a Domingo)', days: 7 },
     month: { label: 'Este Mês', days: 30 },
     year: { label: 'Este Ano', days: 365 }
   };
@@ -69,7 +69,9 @@ export const Dashboard: React.FC = () => {
       case 'week':
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
-        return `${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a ${now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+        const endOfWeekDesc = new Date(startOfWeek);
+        endOfWeekDesc.setDate(startOfWeek.getDate() + 7);
+        return `${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a ${endOfWeekDesc.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
       case 'month':
         return `${now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`;
       case 'year':
@@ -220,18 +222,17 @@ export const Dashboard: React.FC = () => {
           endDate = endOfToday;
           break;
         case 'week':
-          // Início da semana (domingo)
+          // Semana Domingo a Domingo
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - today.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
-          
-          // Fim da semana (sábado) ou hoje se ainda estivermos na semana
+
           const endOfWeek = new Date(startOfWeek);
-          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          endOfWeek.setDate(startOfWeek.getDate() + 7);
           endOfWeek.setHours(23, 59, 59, 999);
-          
+
           startDate = startOfWeek;
-          endDate = endOfWeek > now ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59) : endOfWeek;
+          endDate = endOfWeek;
           break;
         case 'month':
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);

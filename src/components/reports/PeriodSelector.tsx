@@ -21,9 +21,26 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
       label: 'Hoje'
     },
     {
-      startDate: new Date(new Date().setDate(new Date().getDate() - 7)),
-      endDate: new Date(),
-      label: 'Últimos 7 dias'
+      // Semana atual: de domingo (início) a domingo (fim)
+      startDate: (() => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        // set to Sunday of current week
+        start.setDate(start.getDate() - start.getDay());
+        start.setHours(0, 0, 0, 0);
+        return start;
+      })(),
+      endDate: (() => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        start.setDate(start.getDate() - start.getDay());
+        const end = new Date(start);
+        // move to next Sunday and set end of day (domingo a domingo)
+        end.setDate(end.getDate() + 7);
+        end.setHours(23, 59, 59, 999);
+        return end;
+      })(),
+      label: 'Semanal (Domingo a Domingo)'
     },
     {
       startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
