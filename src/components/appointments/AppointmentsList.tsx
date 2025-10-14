@@ -141,6 +141,7 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
                         <Clock className="h-4 w-4 text-gray-500 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-900 truncate">
                           {formatTime(event.start)} - {formatTime(event.end)}
+                          {!event.resource.isBlock && ` - ${event.resource.client}${event.resource.services?.[0] ? ` - ${event.resource.services[0]}` : ''}`}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
@@ -165,13 +166,15 @@ export const AppointmentsList: React.FC<AppointmentsListProps> = ({
 
                     {/* Informações principais */}
                     <div className="space-y-2 mb-3">
-                      {/* Cliente ou Título do Bloqueio */}
-                      <div className="flex items-center space-x-2">
-                        <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-900 truncate">
-                          {event.resource.isBlock ? event.title : event.resource.client}
-                        </span>
-                      </div>
+                      {/* Título do Bloqueio (cliente já aparece no header) */}
+                      {event.resource.isBlock && (
+                        <div className="flex items-center space-x-2">
+                          <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {event.title}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Barbeiro */}
                       <div className="flex items-center space-x-2">

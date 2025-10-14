@@ -83,8 +83,11 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
     
     // Calcular posição relativa ao horário de início (8h = 480 minutos)
     const dayStartMinutes = startHour * 60;
-    const top = ((startMinutes - dayStartMinutes) / 60) * 50; // 50px por hora para mobile
-    const height = (duration / 60) * 50; // 50px por hora para mobile
+    // Pequeno espaçamento entre eventos para evitar que fiquem "embolados" no mobile
+    const EVENT_GAP_PX = 4; // gap discreto
+    const top = ((startMinutes - dayStartMinutes) / 60) * 50; // manter posição exata do horário
+    const rawHeight = (duration / 60) * 50; // altura base
+    const height = Math.max(rawHeight - EVENT_GAP_PX, 2); // remover altura mínima para não causar sobreposição
 
     // Obter informações de sobreposição
     const overlap = eventOverlaps[event.id] || { column: 0, totalColumns: 1 };
@@ -95,7 +98,7 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
 
     return {
       top: `${top}px`,
-      height: `${Math.max(height, 40)}px`, // Altura mínima de 40px para mobile
+      height: `${height}px`,
       width: `${width}%`,
       left: `${left}%`,
     };
@@ -169,27 +172,30 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
               {dayEvents.map(event => {
                 const style = getEventStyle(event);
                 const colorClass = getEventColor(event.resource.status);
+                const primaryService = !event.resource.isBlock ? (event.resource.services?.[0] || null) : null;
                 
                 return (
                   <div
                     key={event.id}
                     className={`absolute rounded-md border-l-3 shadow-sm cursor-pointer pointer-events-auto ${colorClass} hover:shadow-md transition-all duration-200 active:scale-95`}
                     style={{
-                      ...style,
-                      minHeight: '40px', // Altura mínima reduzida para mobile
+                      ...style
                     }}
                     onClick={() => onSelectEvent(event)}
                   >
                     <div className="p-1 h-full overflow-hidden flex flex-col">
-                      {/* Horário - sempre visível */}
-                      <div className="text-xs font-medium opacity-95 mb-0.5 leading-tight flex-shrink-0">
+                      {/* Horário + Cliente (se não for bloqueio) */}
+                      <div className="text-xs font-medium opacity-95 mb-0.5 leading-tight flex-shrink-0 truncate">
                         {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
+                        {!event.resource.isBlock && ` - ${event.resource.client}${primaryService ? ` - ${primaryService}` : ''}`}
                       </div>
-                      
-                      {/* Cliente ou Título do Bloqueio - sempre visível */}
-                      <div className="text-xs font-semibold mb-0.5 leading-tight flex-shrink-0 break-words">
-                        {event.resource.isBlock ? event.title : event.resource.client}
-                      </div>
+
+                      {/* Título do Bloqueio - apenas para bloqueios */}
+                      {event.resource.isBlock && (
+                        <div className="text-xs font-semibold mb-0.5 leading-tight flex-shrink-0 break-words">
+                          {event.title}
+                        </div>
+                      )}
                       
                       {/* Serviços ou Motivo do Bloqueio - sempre visível */}
                       <div className="text-xs opacity-80 mb-0.5 leading-tight flex-1 break-words overflow-hidden">
