@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Appointment, AppointmentFormData, AppointmentsResponse, CalendarEvent } from '../types/appointment';
 import { Service } from '../types/service';
@@ -14,32 +15,132 @@ export const useAppointments = () => {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const { user } = useAuth();
+  const lastFiltersRef = useRef<{ startDate?: Date; endDate?: Date; barberId?: number }>({});
+  const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
+  const reloadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Função para recarregar appointments
   const reloadAppointments = useCallback(async (startDate?: Date, endDate?: Date, barberId?: number) => {
     console.log('🔄 useAppointments: Iniciando recarregamento de agendamentos...');
     try {
-      const response = await fetchAppointments(startDate, endDate, barberId);
+      const effectiveStart = startDate ?? lastFiltersRef.current.startDate;
+      const effectiveEnd = endDate ?? lastFiltersRef.current.endDate;
+      const effectiveBarberId = barberId ?? lastFiltersRef.current.barberId;
+
+      const response = await fetchAppointments(effectiveStart, effectiveEnd, effectiveBarberId);
       setAppointments(response.appointments);
       setTotalCount(response.count);
+
+      // Persistir filtros usados para próximos reloads em tempo real
+      lastFiltersRef.current = {
+        startDate: effectiveStart,
+        endDate: effectiveEnd,
+        barberId: effectiveBarberId
+      };
+
       console.log('✅ useAppointments: Agendamentos recarregados com sucesso:', response.appointments.length, 'agendamentos');
     } catch (error) {
       console.error('❌ useAppointments: Erro ao recarregar agendamentos:', error);
     }
   }, []);
 
+  // Debounce para evitar corrida entre INSERT do appointment e INSERT de appointment_services
+  const debouncedReload = useCallback((delayMs: number = 400) => {
+    if (reloadTimerRef.current) {
+      clearTimeout(reloadTimerRef.current);
+    }
+    reloadTimerRef.current = setTimeout(() => {
+      reloadAppointments();
+    }, delayMs);
+  }, [reloadAppointments]);
+
   // Configurar subscription em tempo real para appointments
   useRealtimeSubscription({
     table: 'appointments',
+    onInsert: (payload) => {
+      console.log('📥 useAppointments: INSERT em appointments:', payload);
+      debouncedReload(500);
+    },
+    onUpdate: (payload) => {
+      console.log('✏️ useAppointments: UPDATE em appointments:', payload);
+      debouncedReload(300);
+    },
+    onDelete: (payload) => {
+      console.log('🗑️ useAppointments: DELETE em appointments:', payload);
+      debouncedReload(300);
+    },
     onChange: (payload) => {
-      console.log('🔄 useAppointments: Recebido evento de mudança na tabela appointments:', payload);
-      // Recarregar dados quando houver qualquer mudança
-      // Nota: Como não temos acesso aos filtros atuais aqui, recarregamos sem filtros
-      // O componente deve chamar reloadAppointments com os filtros corretos quando necessário
-      reloadAppointments();
+      // Fallback genérico
+      console.log('🔄 useAppointments: Evento genérico em appointments:', payload);
+      debouncedReload(400);
     },
     showNotifications: false // Desabilitar notificações automáticas para evitar spam
   });
+
+  // Assinar mudanças em bloqueios de agenda para refletir imediatamente na visão do calendário
+  useRealtimeSubscription({
+    table: 'schedule_blocks',
+    onInsert: (payload) => {
+      console.log('📥 useAppointments: INSERT em schedule_blocks:', payload);
+      debouncedReload(400);
+    },
+    onUpdate: (payload) => {
+      console.log('✏️ useAppointments: UPDATE em schedule_blocks:', payload);
+      debouncedReload(300);
+    },
+    onDelete: (payload) => {
+      console.log('🗑️ useAppointments: DELETE em schedule_blocks:', payload);
+      debouncedReload(300);
+    },
+    onChange: (payload) => {
+      console.log('🔄 useAppointments: Evento genérico em schedule_blocks:', payload);
+      debouncedReload(350);
+    },
+    showNotifications: false
+  });
+
+  // Canal de broadcast para sincronização imediata entre sessões (admin/barbeiro)
+  useEffect(() => {
+    const channel = supabase
+      .channel('appointments-sync')
+      .on('broadcast', { event: 'appointments_change' }, (payload) => {
+        console.log('📡 Broadcast recebido: appointments_change', payload);
+        debouncedReload(450);
+      })
+      .subscribe((status) => {
+        console.log('🔌 Broadcast channel status:', status);
+      });
+
+    broadcastChannelRef.current = channel;
+
+    return () => {
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.unsubscribe();
+        broadcastChannelRef.current = null;
+      }
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+        reloadTimerRef.current = null;
+      }
+    };
+  }, [debouncedReload]);
+
+  // Helper para enviar broadcast após qualquer alteração
+  const notifyAppointmentsChange = async () => {
+    try {
+      if (!broadcastChannelRef.current) {
+        broadcastChannelRef.current = supabase.channel('appointments-sync').subscribe();
+      }
+      await broadcastChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'appointments_change',
+        payload: { ts: Date.now() }
+      });
+      console.log('📣 Broadcast enviado: appointments_change');
+    } catch (error) {
+      console.error('❌ Erro ao enviar broadcast:', error);
+    }
+  };
 
   const fetchAppointments = async (
     startDate?: Date,
@@ -47,6 +148,8 @@ export const useAppointments = () => {
     barberId?: number
   ): Promise<AppointmentsResponse> => {
     try {
+      // Persistir filtros atuais sempre que buscar
+      lastFiltersRef.current = { startDate, endDate, barberId };
       // Função para buscar uma página de agendamentos
       const fetchPage = async (from: number, to: number) => {
         let query = supabase
@@ -337,6 +440,8 @@ export const useAppointments = () => {
         : 'Agendamento criado com sucesso!';
       
       toast.success(message);
+      // Notificar outras sessões (admin/barbeiro)
+      await notifyAppointmentsChange();
       return firstAppointment;
     } catch (error: any) {
       console.error('Erro ao criar agendamento:', error);
@@ -451,8 +556,8 @@ export const useAppointments = () => {
       };
   
       toast.success(statusMessages[status as keyof typeof statusMessages] || 'Status atualizado');
-      
-      // Recarregar agendamentos após atualização bem-sucedida
+      // Notificar e recarregar
+      await notifyAppointmentsChange();
       await reloadAppointments();
   
       return true;
@@ -473,6 +578,7 @@ export const useAppointments = () => {
       if (error) throw error;
 
       toast.success('Agendamento reagendado com sucesso!');
+      await notifyAppointmentsChange();
       return true;
     } catch (error: any) {
       console.error('Erro ao reagendar:', error);
@@ -574,7 +680,7 @@ export const useAppointments = () => {
       if (insertServicesError) throw insertServicesError;
 
       toast.success('Agendamento atualizado com sucesso!');
-      
+      await notifyAppointmentsChange();
       // Recarregar agendamentos após atualização bem-sucedida
       await reloadAppointments();
       
@@ -612,11 +718,17 @@ export const useAppointments = () => {
     recurrencePattern?: any;
     recurrenceEndDate?: string;
   }): Promise<boolean> => {
+    console.log('🚀 createScheduleBlock: Iniciando criação de bloqueio');
+    console.log('📋 Dados recebidos:', blockData);
+    console.log('👤 Usuário atual:', { id: user?.id, role: user?.role });
+    
     try {
       let finalBarberId = blockData.barberId;
+      console.log('🎯 barberId inicial:', finalBarberId);
 
       // Se for barbeiro, forçar o uso do próprio ID
       if (user?.role === 'barber') {
+        console.log('👨‍💼 Usuário é barbeiro, buscando ID do barbeiro...');
         // Buscar o barbeiro correspondente ao usuário logado
         const { data: barberData, error: barberError } = await supabase
           .from('barbers')
@@ -625,25 +737,38 @@ export const useAppointments = () => {
           .single();
 
         if (barberError || !barberData) {
+          console.error('❌ Erro ao buscar barbeiro:', barberError);
           toast.error('Erro ao identificar barbeiro');
           return false;
         }
 
         finalBarberId = barberData.id;
+        console.log('✅ ID do barbeiro encontrado:', finalBarberId);
       }
 
       // Se for admin e não especificou barbeiro, erro
       if (user?.role === 'admin' && !finalBarberId) {
+        console.error('❌ Admin sem barbeiro selecionado');
+        console.log('🔍 Detalhes:', { role: user?.role, barberId: finalBarberId, originalBarberId: blockData.barberId });
         toast.error('Selecione um barbeiro para o bloqueio');
         return false;
       }
 
+      console.log('✅ Validação de barbeiro passou. finalBarberId:', finalBarberId);
+
       // Validar dados de recorrência
       if (blockData.isRecurring) {
+        console.log('🔄 Validando dados de recorrência...');
         if (!blockData.recurrenceType || !blockData.recurrencePattern || !blockData.recurrenceEndDate) {
+          console.error('❌ Dados de recorrência incompletos:', {
+            recurrenceType: blockData.recurrenceType,
+            recurrencePattern: blockData.recurrencePattern,
+            recurrenceEndDate: blockData.recurrenceEndDate
+          });
           toast.error('Dados de recorrência incompletos');
           return false;
         }
+        console.log('✅ Dados de recorrência válidos');
       }
 
       const insertData: any = {
@@ -654,22 +779,32 @@ export const useAppointments = () => {
         reason: blockData.reason || null,
         created_by: user?.id || null,
         is_recurring: blockData.isRecurring || false,
-        recurrence_type: blockData.recurrenceType || null,
-        recurrence_pattern: blockData.recurrencePattern || null,
-        recurrence_end_date: blockData.recurrenceEndDate || null
+        // Se não for recorrente, todos os campos de recorrência devem ser NULL
+        recurrence_type: blockData.isRecurring ? blockData.recurrenceType : null,
+        recurrence_pattern: blockData.isRecurring ? blockData.recurrencePattern : null,
+        recurrence_end_date: blockData.isRecurring ? blockData.recurrenceEndDate : null
       };
+
+      console.log('💾 Dados para inserção no banco:', insertData);
+      console.log('🔄 Executando insert na tabela schedule_blocks...');
 
       const { error } = await supabase
         .from('schedule_blocks')
         .insert(insertData);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro no insert:', error);
+        throw error;
+      }
+
+      console.log('✅ Bloqueio inserido com sucesso no banco!');
 
       if (blockData.isRecurring) {
         toast.success('Bloqueio recorrente criado com sucesso!');
       } else {
         toast.success('Período bloqueado com sucesso!');
       }
+      await notifyAppointmentsChange();
       return true;
     } catch (error: any) {
       console.error('Erro ao criar bloqueio:', error);
@@ -697,7 +832,7 @@ export const useAppointments = () => {
       if (error) throw error;
 
       toast.success('Agendamento excluído com sucesso!');
-      
+      await notifyAppointmentsChange();
       // Recarregar agendamentos após exclusão bem-sucedida
       await reloadAppointments();
       
@@ -743,6 +878,7 @@ export const useAppointments = () => {
       if (error) throw error;
 
       toast.success(`${appointments.length} agendamentos da série recorrente excluídos com sucesso!`);
+      await notifyAppointmentsChange();
       return true;
     } catch (error: any) {
       console.error('Erro ao excluir agendamentos recorrentes:', error);
@@ -869,6 +1005,7 @@ export const useAppointments = () => {
       }
 
       toast.success(`${appointments.length} agendamentos da série recorrente atualizados com sucesso!`);
+      await notifyAppointmentsChange();
       return true;
     } catch (error: any) {
       console.error('Erro ao atualizar agendamentos recorrentes:', error);
@@ -917,12 +1054,18 @@ export const useAppointments = () => {
     // Buscar bloqueios de agenda
     const blocks = await loadScheduleBlocks(barberId);
     
-    // Converter agendamentos
-    const appointmentEvents = appointments.map(appointment => {
-      const startTime = new Date(appointment.appointment_datetime);
-      
-      // Usar duração salva no banco ou calcular baseada no tipo de barbeiro
-      let totalDuration = 0;
+    // Converter agendamentos (filtrar por barbeiro quando barberId informado)
+    const appointmentEvents = appointments
+      .filter(appointment => {
+        if (!barberId) return true;
+        const aptBarberId = appointment.barber_id || appointment.barber?.id;
+        return aptBarberId === barberId;
+      })
+      .map(appointment => {
+        const startTime = new Date(appointment.appointment_datetime);
+        
+        // Usar duração salva no banco ou calcular baseada no tipo de barbeiro
+        let totalDuration = 0;
       
       if (appointment.duration_minutes && appointment.duration_minutes > 0) {
         // Usar duração salva no banco (customizada ou padrão)
@@ -1009,6 +1152,7 @@ export const useAppointments = () => {
 
         if (error) throw error;
         toast.success('Bloqueio excluído com sucesso!');
+        await notifyAppointmentsChange();
         return true;
       }
 
@@ -1044,6 +1188,7 @@ export const useAppointments = () => {
 
         if (error) throw error;
         toast.success('Bloqueios futuros excluídos com sucesso!');
+        await notifyAppointmentsChange();
       } else if (deleteType === 'all') {
         // Deletar toda a série de bloqueios
         const parentId = blockInfo.parent_block_id || blockId;
@@ -1056,6 +1201,7 @@ export const useAppointments = () => {
 
         if (error) throw error;
         toast.success('Série de bloqueios excluída com sucesso!');
+        await notifyAppointmentsChange();
       }
 
       return true;
