@@ -746,12 +746,9 @@ export const useAppointments = () => {
         console.log('✅ ID do barbeiro encontrado:', finalBarberId);
       }
 
-      // Se for admin e não especificou barbeiro, erro
+      // Admin pode criar bloqueio geral (para todos os barbeiros) sem especificar barbeiro
       if (user?.role === 'admin' && !finalBarberId) {
-        console.error('❌ Admin sem barbeiro selecionado');
-        console.log('🔍 Detalhes:', { role: user?.role, barberId: finalBarberId, originalBarberId: blockData.barberId });
-        toast.error('Selecione um barbeiro para o bloqueio');
-        return false;
+        console.log('ℹ️ Admin criando bloqueio geral (sem barbeiro específico)');
       }
 
       console.log('✅ Validação de barbeiro passou. finalBarberId:', finalBarberId);
@@ -772,7 +769,7 @@ export const useAppointments = () => {
       }
 
       const insertData: any = {
-        barber_id: finalBarberId,
+        barber_id: finalBarberId ?? null,
         block_date: blockData.date,
         start_time: blockData.startTime,
         end_time: blockData.endTime,

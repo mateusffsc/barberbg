@@ -70,10 +70,13 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
       // Atualizar o estado local com os barbeiros carregados
       if (result.barbers && result.barbers.length > 0) {
         setBarbers(result.barbers);
+      } else {
+        setBarbers([]);
       }
     } catch (error) {
       console.error('Erro ao carregar barbeiros:', error);
       toast.error('Erro ao carregar barbeiros');
+      setBarbers([]);
     }
   };
 
@@ -90,11 +93,12 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
       return;
     }
 
-    // Validar seleção de barbeiro para admins
-    if (user?.role === 'admin' && !blockData.barber_id) {
-      toast.error('Selecione um barbeiro para o bloqueio');
-      return;
-    }
+    // Admin pode optar por bloqueio geral (sem barbeiro específico)
+    // Caso não selecione barbeiro, o bloqueio será aplicado a todos os barbeiros
+
+    console.log('✅ VALIDAÇÃO PASSOU:');
+    console.log('- Usuário role:', user?.role);
+    console.log('- barber_id selecionado:', blockData.barber_id);
 
     // Validar campos de recorrência se necessário
     if (blockData.isRecurring) {
@@ -214,12 +218,20 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
                     Barbeiro *
                   </label>
                   <select
-                    value={blockData.barber_id || ''}
-                    onChange={(e) => handleInputChange('barber_id', e.target.value ? parseInt(e.target.value) : undefined)}
+                    value={
+                      typeof blockData.barber_id === 'number' ? blockData.barber_id : 'ALL'
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'ALL') {
+                        handleInputChange('barber_id', undefined);
+                      } else {
+                        handleInputChange('barber_id', parseInt(val));
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                    required
                   >
-                    <option value="">Selecione um barbeiro</option>
+                    <option value="ALL">Todos os barbeiros</option>
                     {barbers.map((barber) => (
                       <option key={barber.id} value={barber.id}>
                         {barber.name}
