@@ -785,12 +785,13 @@ export const useAppointments = () => {
         return null;
       };
 
-      const normalizedDate = normalizeDate(blockData.date) || new Date().toISOString().split('T')[0];
-      const normalizedStart = normalizeTime(blockData.startTime);
-      const normalizedEnd = normalizeTime(blockData.endTime);
+      const normalizedDate = normalizeDate((blockData as any).date) || new Date().toISOString().split('T')[0];
+      // Suportar ambos formatos: startTime/endTime (camelCase) e start_time/end_time (snake_case)
+      const normalizedStart = normalizeTime((blockData as any).startTime ?? (blockData as any).start_time);
+      const normalizedEnd = normalizeTime((blockData as any).endTime ?? (blockData as any).end_time);
 
       if (!normalizedStart || !normalizedEnd) {
-        console.error('❌ Horários inválidos para bloqueio:', { startTime: blockData.startTime, endTime: blockData.endTime });
+        console.error('❌ Horários inválidos para bloqueio:', { startTime: (blockData as any).startTime ?? (blockData as any).start_time, endTime: (blockData as any).endTime ?? (blockData as any).end_time });
         toast.error('Horários inválidos para bloqueio');
         return false;
       }

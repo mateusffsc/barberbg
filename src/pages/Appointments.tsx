@@ -592,22 +592,34 @@ export const Appointments: React.FC = () => {
   };
 
   const handleBlockSchedule = async (blockData: any) => {
+    console.log('🚀 handleBlockSchedule: Recebido blockData:', blockData);
+    // Guardar contra payload inesperado (ex.: apenas string com data)
+    const payload = typeof blockData === 'string' ? { date: blockData } : blockData;
+    if (!payload) {
+      toast.error('Payload de bloqueio inválido');
+      return;
+    }
+    // Verificar presença de horários em qualquer convenção
+    const hasStart = !!(payload.startTime ?? payload.start_time);
+    const hasEnd = !!(payload.endTime ?? payload.end_time);
+    if (!hasStart || !hasEnd) {
+      console.error('❌ handleBlockSchedule: horários ausentes', { startTime: payload.startTime ?? payload.start_time, endTime: payload.endTime ?? payload.end_time });
+      toast.error('Informe horário de início e fim');
+      return;
+    }
     try {
-      await createScheduleBlock(
-        blockData.date,
-        blockData.startTime,
-        blockData.endTime,
-        blockData.reason,
-        blockData.barberId,
-        blockData.isRecurring,
-        blockData.recurrenceType,
-        blockData.recurrencePattern,
-        blockData.recurrenceEndDate
-      );
-      await reloadAppointmentsWithFilters();
-      setShowBlockModal(false);
+      const success = await createScheduleBlock(payload);
+      console.log('📊 Resultado do createScheduleBlock:', success);
+      
+      if (success) {
+        console.log('✅ Bloqueio criado com sucesso, recarregando appointments...');
+        await reloadAppointmentsWithFilters();
+        setShowBlockModal(false);
+      } else {
+        console.error('❌ createScheduleBlock retornou false');
+      }
     } catch (error) {
-      console.error('Erro ao bloquear horário:', error);
+      console.error('❌ Erro ao bloquear horário:', error);
       toast.error('Erro ao bloquear horário');
     }
   };
@@ -816,11 +828,11 @@ export const Appointments: React.FC = () => {
         </div>
       </div>
 
-      {/* Layout Mobile/Tablet (<1024px) - layout original */}
+      {/* Layout Mobile/Tablet (<1024px) - otimizado para ocupar toda a largura */}
       <div className="lg:hidden">
-        <div className="p-4 space-y-4">
+        <div className="px-2 py-2 space-y-3">
           {/* Botões de Ação Mobile */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="bg-white rounded-md border border-gray-200 px-3 py-3">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Ações</h3>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -845,7 +857,7 @@ export const Appointments: React.FC = () => {
 
           {/* Filtro de Barbeiro Mobile (apenas para admin) */}
           {user?.role === 'admin' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="bg-white rounded-md border border-gray-200 px-3 py-3">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Filtros</h3>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
@@ -875,12 +887,8 @@ export const Appointments: React.FC = () => {
             </div>
           )}
 
-          {/* Content Mobile */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 min-h-0 relative overflow-hidden" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)' }}>
-            {/* Decorative background */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-50 to-blue-50 rounded-full translate-y-12 -translate-x-12 opacity-50"></div>
-
+          {/* Content Mobile - sem bordas e sem padding para preencher a tela */}
+          <div className="min-h-0 relative overflow-hidden" style={{ height: 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)' }}>
             <div className="relative z-10 h-full">
               <AppointmentCalendar
                 events={events}
