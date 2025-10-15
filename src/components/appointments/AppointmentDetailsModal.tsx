@@ -79,6 +79,21 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     }
     return result;
   })();
+
+  // Ao digitar na busca, selecionar automaticamente o primeiro cliente correspondente
+  useEffect(() => {
+    const q = clientSearch.trim().toLowerCase();
+    const qDigits = normalizePhone(clientSearch);
+    if (!q && !qDigits) return;
+    const matches = clients.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      normalizePhone(c.phone).includes(qDigits)
+    );
+    const first = matches[0];
+    if (first && editData.client_id !== first.id) {
+      setEditData(prev => ({ ...prev, client_id: first.id }));
+    }
+  }, [clientSearch, clients]);
   
   // Inicializar dados de edição quando o evento mudar
   useEffect(() => {
