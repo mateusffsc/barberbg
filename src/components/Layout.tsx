@@ -118,6 +118,7 @@ export const Layout: React.FC = () => {
             {filteredMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
+              const showLabel = !sidebarCollapsed || sidebarOpen;
               
               return (
                 <div key={item.path} className="relative group">
@@ -127,21 +128,21 @@ export const Layout: React.FC = () => {
                       setSidebarOpen(false);
                     }}
                     className={`w-full flex items-center text-sm font-medium rounded-lg transition-colors ${
-                      sidebarCollapsed ? 'lg:justify-center lg:px-3 lg:py-3' : 'px-4 py-3'
+                      showLabel ? 'px-4 py-3' : 'lg:justify-center lg:px-3 lg:py-3'
                     } ${
                       isActive
                         ? 'bg-gray-800 text-white'
                         : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                     }`}
                   >
-                    <Icon className={`h-5 w-5 ${sidebarCollapsed ? '' : 'mr-3'}`} />
-                    {!sidebarCollapsed && (
-                      <span className="lg:block">{item.name}</span>
+                    <Icon className={`h-5 w-5 ${showLabel ? 'mr-3' : ''}`} />
+                    {showLabel && (
+                      <span className="block">{item.name}</span>
                     )}
                   </button>
                   
                   {/* Tooltip for collapsed state */}
-                  {sidebarCollapsed && (
+                  {sidebarCollapsed && !sidebarOpen && (
                     <div className="hidden lg:group-hover:block absolute left-full top-0 ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg shadow-lg whitespace-nowrap z-50">
                       {item.name}
                       <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-800 rotate-45"></div>
@@ -208,7 +209,7 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-2 sm:p-4 lg:p-6">
           <Outlet />
         </main>
       </div>
