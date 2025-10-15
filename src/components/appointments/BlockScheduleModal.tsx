@@ -123,20 +123,24 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
           case 'daily':
             recurrencePattern = { interval: 1 };
             break;
-          case 'weekly':
-            const dayOfWeek = new Date(blockData.date).getDay();
-            recurrencePattern = { 
-              interval: 1, 
-              days_of_week: [dayOfWeek] 
+          case 'weekly': {
+            const [y, m, d] = blockData.date.split('-').map(Number);
+            const dayOfWeek = new Date(y, m - 1, d).getDay();
+            recurrencePattern = {
+              interval: 1,
+              days_of_week: [dayOfWeek]
             };
             break;
-          case 'monthly':
-            const dayOfMonth = new Date(blockData.date).getDate();
-            recurrencePattern = { 
-              interval: 1, 
-              day_of_month: dayOfMonth 
+          }
+          case 'monthly': {
+            const [, , dd] = blockData.date.split('-').map(Number);
+            const dayOfMonth = dd;
+            recurrencePattern = {
+              interval: 1,
+              day_of_month: dayOfMonth
             };
             break;
+          }
         }
       }
 
