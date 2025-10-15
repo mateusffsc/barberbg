@@ -54,19 +54,21 @@ BEGIN
             END LOOP;
             
         WHEN 'weekly' THEN
-                -- Extrair dias da semana do padrão JSON
-                SELECT array_agg(value::INTEGER) INTO days_of_week
+                -- Extrair dias da semana do padrão JSON (chave: days_of_week)
+                SELECT COALESCE(array_agg(value::INTEGER), ARRAY[]::INTEGER[]) INTO days_of_week
                 FROM jsonb_array_elements_text(parent_block.recurrence_pattern->'days_of_week');
-                
-                -- Para recorrência semanal simples (mesmo dia da semana)
-                target_day_of_week := days_of_week[1];
-                
-                -- Começar da próxima recorrência (mesmo dia da semana + 8 dias)
-                block_date_iter := block_date_iter + 8;
-                
+
+                -- Se não houver padrão, repetir no mesmo dia da semana do bloqueio pai
+                IF array_length(days_of_week, 1) IS NULL THEN
+                    days_of_week := ARRAY[EXTRACT(DOW FROM parent_block.block_date)::INTEGER];
+                END IF;
+
+                -- Começar a partir do dia seguinte ao bloqueio pai (não contar o dia selecionado)
+                block_date_iter := parent_block.block_date + 1;
+
                 WHILE block_date_iter <= end_date LOOP
-                    -- Verificar se é o dia da semana correto
-                    IF EXTRACT(DOW FROM block_date_iter)::INTEGER = target_day_of_week THEN
+                    -- Inserir apenas nas próximas ocorrências do(s) dia(s) da semana definido(s)
+                    IF EXTRACT(DOW FROM block_date_iter)::INTEGER = ANY(days_of_week) THEN
                         INSERT INTO schedule_blocks (
                             barber_id, block_date, start_time, end_time, reason,
                             is_recurring, recurrence_type, recurrence_pattern, 
@@ -80,8 +82,8 @@ BEGIN
                         generated_count := generated_count + 1;
                     END IF;
                     
-                    -- Pular para a próxima recorrência (+ 8 dias)
-                    block_date_iter := block_date_iter + 8;
+                    -- Avançar um dia
+                    block_date_iter := block_date_iter + 1;
                 END LOOP;
             
         WHEN 'monthly' THEN
