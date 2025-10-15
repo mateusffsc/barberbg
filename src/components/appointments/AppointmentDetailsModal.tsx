@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Edit3, Save, RotateCcw, Trash2, Search } from 'lucide-react';
 import { CalendarEvent } from '../../types/appointment';
 import { PaymentMethod, MultiplePaymentInfo } from '../../types/payment';
@@ -64,36 +64,43 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   // Busca de cliente por nome ou telefone no modo de edição
   const [clientSearch, setClientSearch] = useState('');
   const normalizePhone = (s: string | undefined | null) => (s || '').replace(/\D/g, '');
-  const filteredClients = (() => {
-    const q = clientSearch.trim().toLowerCase();
+  const normalizeText = (s: string | undefined | null) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const filteredClients = useMemo(() => {
+    const q = normalizeText(clientSearch);
     const qDigits = normalizePhone(clientSearch);
-    let result = q || qDigits
-      ? clients.filter(c =>
-          c.name.toLowerCase().includes(q) ||
-          normalizePhone(c.phone).includes(qDigits)
-        )
-      : clients;
-    const selectedClient = clients.find(c => c.id === editData.client_id);
-    if ((q || qDigits) && selectedClient && !result.some(c => c.id === selectedClient.id)) {
-      result = [selectedClient, ...result];
-    }
-    return result;
-  })();
+    if (!q && !qDigits) return clients;
+    const scored = clients
+      .map(c => {
+        const nameNorm = normalizeText(c.name);
+        const phoneDigits = normalizePhone(c.phone);
+        let score = 0;
+        if (q) {
+          if (nameNorm === q) score += 100;
+          else if (nameNorm.startsWith(q)) score += 80;
+          else if (nameNorm.includes(q)) score += 60;
+        }
+        if (qDigits) {
+          if (phoneDigits === qDigits) score += 90;
+          else if (phoneDigits.startsWith(qDigits)) score += 70;
+          else if (phoneDigits.includes(qDigits)) score += 50;
+        }
+        return { c, score };
+      })
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.c.name.localeCompare(b.c.name));
+    return scored.map(x => x.c);
+  }, [clientSearch, clients]);
 
   // Ao digitar na busca, selecionar automaticamente o primeiro cliente correspondente
   useEffect(() => {
-    const q = clientSearch.trim().toLowerCase();
+    const q = normalizeText(clientSearch);
     const qDigits = normalizePhone(clientSearch);
     if (!q && !qDigits) return;
-    const matches = clients.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      normalizePhone(c.phone).includes(qDigits)
-    );
-    const first = matches[0];
+    const first = filteredClients[0];
     if (first && editData.client_id !== first.id) {
       setEditData(prev => ({ ...prev, client_id: first.id }));
     }
-  }, [clientSearch, clients]);
+  }, [clientSearch, filteredClients]);
   
   // Inicializar dados de edição quando o evento mudar
   useEffect(() => {
