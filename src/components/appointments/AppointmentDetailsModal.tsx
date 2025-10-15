@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Edit3, Save, RotateCcw, Trash2 } from 'lucide-react';
+import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Edit3, Save, RotateCcw, Trash2, Search } from 'lucide-react';
 import { CalendarEvent } from '../../types/appointment';
 import { PaymentMethod, MultiplePaymentInfo } from '../../types/payment';
 import { PaymentConfirmationModal } from '../ui/PaymentConfirmationModal';
@@ -60,6 +60,25 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     custom_duration: '',
     note: ''
   });
+
+  // Busca de cliente por nome ou telefone no modo de edição
+  const [clientSearch, setClientSearch] = useState('');
+  const normalizePhone = (s: string | undefined | null) => (s || '').replace(/\D/g, '');
+  const filteredClients = (() => {
+    const q = clientSearch.trim().toLowerCase();
+    const qDigits = normalizePhone(clientSearch);
+    let result = q || qDigits
+      ? clients.filter(c =>
+          c.name.toLowerCase().includes(q) ||
+          normalizePhone(c.phone).includes(qDigits)
+        )
+      : clients;
+    const selectedClient = clients.find(c => c.id === editData.client_id);
+    if ((q || qDigits) && selectedClient && !result.some(c => c.id === selectedClient.id)) {
+      result = [selectedClient, ...result];
+    }
+    return result;
+  })();
   
   // Inicializar dados de edição quando o evento mudar
   useEffect(() => {
@@ -508,13 +527,34 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                       <User className="inline w-4 h-4 mr-1" />
                       Cliente
                     </label>
+                    {/* Campo de busca por nome/telefone */}
+                    <div className="relative mb-2">
+                      <Search className="absolute left-2 top-2.5 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={clientSearch}
+                        onChange={(e) => setClientSearch(e.target.value)}
+                        placeholder="Pesquisar por nome ou telefone..."
+                        className="w-full pl-8 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {clientSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setClientSearch('')}
+                          className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                          title="Limpar busca"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
                     <select
                       value={editData.client_id}
                       onChange={(e) => setEditData(prev => ({ ...prev, client_id: parseInt(e.target.value) }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value={0}>Selecione um cliente</option>
-                      {clients.map(client => (
+                      {filteredClients.map(client => (
                         <option key={client.id} value={client.id}>
                           {client.name} - {client.phone}
                         </option>
