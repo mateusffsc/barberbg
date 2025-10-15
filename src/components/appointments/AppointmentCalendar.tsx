@@ -215,8 +215,8 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     return events;
   };
 
-  // Se for mobile ou visualização de semana/dia, mostrar lista em vez de calendário
-  if (isMobile || view === Views.WEEK || view === Views.DAY) {
+  // Se for mobile (exceto MÊS) ou visualização de semana/dia, mostrar lista em vez de calendário
+  if ((isMobile && view !== Views.MONTH) || view === Views.WEEK || view === Views.DAY) {
     // Para visualização do dia, usar componente específico baseado no dispositivo
     if (view === Views.DAY) {
       return (
@@ -672,7 +672,20 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
                   </div>
                 )}
               </div>
-            )
+            ),
+            month: {
+              dateHeader: ({ label, date }: { label: string; date: Date }) => (
+                <button
+                  className="w-full text-left font-semibold hover:underline cursor-pointer"
+                  onClick={() => {
+                    setDate(date);
+                    setView(Views.DAY);
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            }
           }}
         />
       </div>
