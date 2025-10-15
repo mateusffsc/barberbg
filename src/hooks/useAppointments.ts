@@ -768,11 +768,38 @@ export const useAppointments = () => {
         console.log('✅ Dados de recorrência válidos');
       }
 
+      // Normalizar e validar data/hora
+      const normalizeDate = (d?: string) => {
+        if (!d || typeof d !== 'string') return null;
+        const val = d.trim();
+        // Aceitar apenas formato YYYY-MM-DD
+        const isValid = /^\d{4}-\d{2}-\d{2}$/.test(val);
+        return isValid ? val : null;
+      };
+      const normalizeTime = (t?: string) => {
+        if (!t || typeof t !== 'string') return null;
+        const raw = t.trim();
+        // Aceitar HH:MM ou HH:MM:SS
+        if (/^\d{2}:\d{2}$/.test(raw)) return `${raw}:00`;
+        if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+        return null;
+      };
+
+      const normalizedDate = normalizeDate(blockData.date) || new Date().toISOString().split('T')[0];
+      const normalizedStart = normalizeTime(blockData.startTime);
+      const normalizedEnd = normalizeTime(blockData.endTime);
+
+      if (!normalizedStart || !normalizedEnd) {
+        console.error('❌ Horários inválidos para bloqueio:', { startTime: blockData.startTime, endTime: blockData.endTime });
+        toast.error('Horários inválidos para bloqueio');
+        return false;
+      }
+
       const insertData: any = {
         barber_id: finalBarberId ?? null,
-        block_date: blockData.date,
-        start_time: blockData.startTime,
-        end_time: blockData.endTime,
+        block_date: normalizedDate,
+        start_time: normalizedStart,
+        end_time: normalizedEnd,
         reason: blockData.reason || null,
         created_by: user?.id || null,
         is_recurring: blockData.isRecurring || false,
