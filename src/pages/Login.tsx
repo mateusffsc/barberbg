@@ -15,7 +15,7 @@ export const Login: React.FC = () => {
 
   // Redirect if already logged in
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/agendamentos" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
