@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -17,6 +17,12 @@ import { Reports } from './pages/Reports';
 import { MyReports } from './pages/MyReports';
 import { Expenses } from './pages/Expenses';
 
+const RoleLanding: React.FC = () => {
+  const { user } = useAuth();
+  const target = user?.role === 'barber' ? '/meus-agendamentos' : '/agendamentos';
+  return <Navigate to={target} replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -31,7 +37,7 @@ function App() {
               <Layout />
             </ProtectedRoute>
           }>
-            <Route index element={<Dashboard />} />
+            <Route index element={<RoleLanding />} />
             
             {/* Admin only routes */}
             <Route path="agendamentos" element={

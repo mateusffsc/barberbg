@@ -15,7 +15,8 @@ export const Login: React.FC = () => {
 
   // Redirect if already logged in
   if (user) {
-    return <Navigate to="/agendamentos" replace />;
+    const target = user.role === 'barber' ? '/meus-agendamentos' : '/agendamentos';
+    return <Navigate to={target} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +31,8 @@ export const Login: React.FC = () => {
 
     try {
       await signIn(username, password);
+      // Após o login, o componente será re-renderizado e fará o redirecionamento
+      // conforme o papel do usuário acima (Navigate com target dinâmico)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao fazer login');
     } finally {
