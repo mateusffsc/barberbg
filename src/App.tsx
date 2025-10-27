@@ -90,6 +90,9 @@ function App() {
             } />
 
             {/* Shared routes */}
+            <Route path="dashboard" element={
+              <Dashboard />
+            } />
             <Route path="clientes" element={
               <Clients />
             } />

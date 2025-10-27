@@ -28,7 +28,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin', 'barber'] },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'barber'] },
   { name: 'Agendamentos', path: '/agendamentos', icon: Calendar, roles: ['admin'] },
   { name: 'Meus Agendamentos', path: '/meus-agendamentos', icon: Calendar, roles: ['barber'] },
   { name: 'Clientes', path: '/clientes', icon: Users, roles: ['admin', 'barber'] },
