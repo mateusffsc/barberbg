@@ -16,6 +16,7 @@ import { Product } from '../types/product';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
+import { fromLocalDateTimeString, toLocalISOString } from '../utils/dateHelpers';
 
 export const Appointments: React.FC = () => {
   const { user } = useAuth();
@@ -246,7 +247,7 @@ export const Appointments: React.FC = () => {
     setModalLoading(true);
     try {
       // Verificar conflitos antes de criar
-      const conflictCheck = await checkForConflicts(appointmentData);
+      const conflictCheck = await checkForConflicts(appointmentData, selectedServices, recurrence);
       
       if (conflictCheck.hasConflict) {
         setConflictData(conflictCheck);
@@ -265,7 +266,64 @@ export const Appointments: React.FC = () => {
       toast.success('Agendamento criado com sucesso!');
     } catch (error: any) {
       console.error('Erro ao criar agendamento:', error);
-      if (error.message?.includes('conflito')) {
+      // Se a API retornou detalhes de conflitos (recorrente ou bloqueios), abrir modal de conflito
+      if ((error as any)?.conflicts) {
+        const conflicts = (error as any).conflicts;
+
+        // Montar estrutura esperada pelo ConflictModal
+        const firstDate = conflicts[0]?.date || new Date(appointmentData.appointment_datetime);
+
+        // Buscar nomes dos serviços para o novo agendamento
+        let servicesNames = '';
+        if (appointmentData.service_ids && appointmentData.service_ids.length > 0) {
+          const { data: servicesData } = await supabase
+            .from('services')
+            .select('name')
+            .in('id', appointmentData.service_ids);
+          servicesNames = servicesData?.map((s: any) => s.name).join(', ') || '';
+        }
+
+        // Buscar dados do cliente e barbeiro
+        const [clientData, barberData] = await Promise.all([
+          supabase
+            .from('clients')
+            .select('name')
+            .eq('id', appointmentData.client_id)
+            .single(),
+          supabase
+            .from('barbers')
+            .select('name')
+            .eq('id', appointmentData.barber_id)
+            .single()
+        ]);
+
+        setConflictData({
+          hasConflict: true,
+          conflictingAppointments: conflicts.flatMap((c: any) => c.conflicts || []).map((c: any) => ({
+            id: c.id,
+            appointment_datetime: c.appointment_datetime,
+            client_name: c.client_name,
+            barber_name: barberData.data?.name || '',
+            services_names: servicesNames,
+            duration_minutes: c.duration_minutes || 30
+          })),
+          newAppointment: {
+            ...appointmentData,
+            appointment_datetime: firstDate instanceof Date ? firstDate.toISOString() : appointmentData.appointment_datetime,
+            client_name: clientData.data?.name || 'Cliente não informado',
+            barber_name: barberData.data?.name || 'Barbeiro não informado',
+            services_names: servicesNames,
+            duration_minutes: appointmentData.duration_minutes || 30
+          }
+        });
+
+        setPendingAppointmentData(appointmentData);
+        setPendingSelectedServices(selectedServices);
+        setPendingSelectedBarber(selectedBarber);
+        setPendingRecurrence(recurrence);
+        setConflictModalOpen(true);
+        setIsModalOpen(false);
+      } else if (error.message?.includes('conflito')) {
         toast.error(error.message);
       } else {
         toast.error('Erro ao criar agendamento');
@@ -275,7 +333,44 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const checkForConflicts = async (appointmentData: any) => {
+  // Gerar datas baseado na recorrência (cópia simplificada da lógica usada na criação)
+  const generateRecurrenceDates = (startDate: Date, recurrence?: any): Date[] => {
+    const dates = [startDate];
+    if (!recurrence || recurrence.type === 'none') return dates;
+
+    const interval = recurrence.interval || 1;
+    const endDate = recurrence.end_date ? new Date(recurrence.end_date) : null;
+    let maxOccurrences = 52;
+    if (recurrence.occurrences && recurrence.occurrences > 1) {
+      maxOccurrences = Math.min(recurrence.occurrences, 52);
+    } else if (endDate) {
+      // Calcular quantidade aproximada até a data limite
+      // Mantemos lógica simples: limite por tipo
+      maxOccurrences = 52;
+    } else {
+      return dates;
+    }
+
+    for (let i = 1; i < maxOccurrences; i++) {
+      const nextDate = new Date(startDate);
+      switch (recurrence.type) {
+        case 'weekly':
+          nextDate.setDate(startDate.getDate() + (i * 7 * interval));
+          break;
+        case 'biweekly':
+          nextDate.setDate(startDate.getDate() + (i * 14));
+          break;
+        case 'monthly':
+          nextDate.setMonth(startDate.getMonth() + (i * interval));
+          break;
+      }
+      if (endDate && nextDate > endDate) break;
+      dates.push(nextDate);
+    }
+    return dates;
+  };
+
+  const checkForConflicts = async (appointmentData: any, selectedServices?: any[], recurrence?: any) => {
     try {
       // Validar se appointment_datetime existe e é válido
       if (!appointmentData.appointment_datetime) {
@@ -283,47 +378,108 @@ export const Appointments: React.FC = () => {
         return { hasConflict: false };
       }
 
-      const appointmentStart = new Date(appointmentData.appointment_datetime);
+      const initialStart = new Date(appointmentData.appointment_datetime);
       
       // Verificar se a data é válida
-      if (isNaN(appointmentStart.getTime())) {
+      if (isNaN(initialStart.getTime())) {
         console.error('Data inválida:', appointmentData.appointment_datetime);
         return { hasConflict: false };
       }
 
-      // Verificar se duration_minutes existe
-      const durationMinutes = appointmentData.duration_minutes || 60; // Default 60 minutos
-      const appointmentEnd = new Date(appointmentStart.getTime() + (durationMinutes * 60000));
+      // Calcular duração correta
+      let durationMinutes = appointmentData.duration_minutes && appointmentData.duration_minutes > 0
+        ? appointmentData.duration_minutes
+        : 0;
 
-      // Buscar todos os agendamentos do mesmo barbeiro no mesmo dia
-      const dayStart = new Date(appointmentStart);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(appointmentStart);
-      dayEnd.setHours(23, 59, 59, 999);
+      if (!durationMinutes) {
+        // Buscar se o barbeiro é especial para escolher a duração correta dos serviços
+        const { data: barberInfo } = await supabase
+          .from('barbers')
+          .select('is_special_barber')
+          .eq('id', appointmentData.barber_id)
+          .single();
 
-      const { data: allAppointments, error } = await supabase
-        .from('appointments')
-        .select('id, appointment_datetime, duration_minutes, client_name, services_names')
-        .eq('barber_id', appointmentData.barber_id)
-        .eq('status', 'scheduled')
-        .gte('appointment_datetime', dayStart.toISOString())
-        .lte('appointment_datetime', dayEnd.toISOString());
+        const isSpecialBarber = barberInfo?.is_special_barber || false;
 
-      if (error) throw error;
+        if (selectedServices && selectedServices.length > 0) {
+          durationMinutes = selectedServices.reduce((sum: number, service: any) => {
+            const normal = service.duration_minutes_normal ?? 30;
+            const special = service.duration_minutes_special ?? normal;
+            const use = isSpecialBarber ? special : normal;
+            return sum + use;
+          }, 0);
+        } else {
+          // Fallback caso nada venha informado
+          durationMinutes = 30;
+        }
+      }
 
-      // Filtrar agendamentos que realmente se sobrepõem
-      const conflictingAppointments = allAppointments?.filter(existing => {
-        const existingStart = new Date(existing.appointment_datetime);
-        const existingDuration = existing.duration_minutes || 30;
-        const existingEnd = new Date(existingStart.getTime() + (existingDuration * 60000));
+      const appointmentDates = generateRecurrenceDates(fromLocalDateTimeString(appointmentData.appointment_datetime), recurrence);
 
-        // Verificar se há sobreposição real entre os períodos
-        return (
-          (appointmentStart < existingEnd && appointmentEnd > existingStart)
-        );
-      }) || [];
+      const allConflicts: any[] = [];
 
-      if (conflictingAppointments && conflictingAppointments.length > 0) {
+      for (const date of appointmentDates) {
+        const appointmentStart = date;
+        const appointmentEnd = new Date(appointmentStart.getTime() + (durationMinutes * 60000));
+
+        // Buscar todos os agendamentos do mesmo barbeiro no mesmo dia
+        const dayStart = new Date(appointmentStart);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(appointmentStart);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const { data: allAppointments, error } = await supabase
+          .from('appointments')
+          .select('id, appointment_datetime, duration_minutes, client_name, services_names')
+          .eq('barber_id', appointmentData.barber_id)
+          .eq('status', 'scheduled')
+          .gte('appointment_datetime', dayStart.toISOString())
+          .lte('appointment_datetime', dayEnd.toISOString());
+
+        if (error) throw error;
+
+        // Filtrar agendamentos que realmente se sobrepõem
+        const conflictingAppointments = allAppointments?.filter(existing => {
+          const existingStart = new Date(existing.appointment_datetime);
+          const existingDuration = existing.duration_minutes || 30;
+          const existingEnd = new Date(existingStart.getTime() + (existingDuration * 60000));
+
+          return (appointmentStart < existingEnd && appointmentEnd > existingStart);
+        }) || [];
+
+        if (conflictingAppointments.length > 0) {
+          allConflicts.push(...conflictingAppointments.map(c => ({
+            id: c.id,
+            client_name: c.client_name,
+            appointment_datetime: c.appointment_datetime,
+            duration_minutes: c.duration_minutes
+          })));
+        }
+
+        // Verificar bloqueios de agenda no período
+        const appointmentDateStr = appointmentStart.toISOString().split('T')[0];
+        const appointmentTimeStr = appointmentStart.toTimeString().split(' ')[0];
+        const appointmentEndTimeStr = appointmentEnd.toTimeString().split(' ')[0];
+
+        const { data: blocks } = await supabase
+          .from('schedule_blocks')
+          .select('id, reason, start_time, end_time, barber_id')
+          .eq('block_date', appointmentDateStr)
+          .or(`barber_id.eq.${appointmentData.barber_id},barber_id.is.null`)
+          .or(`and(start_time.lte.${appointmentTimeStr},end_time.gt.${appointmentTimeStr}),and(start_time.lt.${appointmentEndTimeStr},end_time.gte.${appointmentEndTimeStr}),and(start_time.gte.${appointmentTimeStr},end_time.lte.${appointmentEndTimeStr})`);
+
+        if (blocks && blocks.length > 0) {
+          // Tratar bloqueios como conflitos também
+          allConflicts.push(...blocks.map(b => ({
+            id: b.id,
+            client_name: `[Bloqueio] ${b.reason || 'Período bloqueado'}`,
+            appointment_datetime: `${appointmentDateStr}T${b.start_time}`,
+            duration_minutes: 0
+          })));
+        }
+      }
+
+      if (allConflicts.length > 0) {
         // Buscar dados do cliente e barbeiro para o novo agendamento
         const [clientData, barberData] = await Promise.all([
           supabase
@@ -351,7 +507,7 @@ export const Appointments: React.FC = () => {
 
         return {
           hasConflict: true,
-          conflictingAppointments: conflictingAppointments,
+          conflictingAppointments: allConflicts,
           newAppointment: {
             ...appointmentData,
             client_name: clientData.data?.name || 'Cliente não informado',
