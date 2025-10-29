@@ -62,6 +62,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   });
   const [newClientErrors, setNewClientErrors] = useState<any>({});
   const [creatingClient, setCreatingClient] = useState(false);
+  const [searchedClients, setSearchedClients] = useState<Client[]>([]);
+  const [searchingClients, setSearchingClients] = useState(false);
 
   useEffect(() => {
     if (selectedDate) {
@@ -94,18 +96,52 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       setNewClientData({ name: '', phone: '', email: '' });
       setNewClientErrors({});
       setErrors({});
+      setSearchedClients([]);
     }
   }, [isOpen, selectedDate, user]);
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(clientSearch.toLowerCase())
-  );
+  // Função para buscar clientes dinamicamente
+  const searchClients = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setSearchedClients([]);
+      return;
+    }
+
+    setSearchingClients(true);
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+        .order('name');
+
+      if (error) throw error;
+      setSearchedClients(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar clientes:', error);
+      setSearchedClients([]);
+    } finally {
+      setSearchingClients(false);
+    }
+  };
+
+  // Debounce para a busca de clientes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchClients(clientSearch);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [clientSearch]);
+
+  // Usar clientes buscados dinamicamente ou todos os clientes se não há busca
+  const displayClients = clientSearch.trim() ? searchedClients : clients;
 
   const filteredServices = services.filter(service =>
     service.name.toLowerCase().includes(serviceSearch.toLowerCase())
   );
 
-  const selectedClient = clients.find(c => c.id === formData.client_id);
+  const selectedClient = [...clients, ...searchedClients].find(c => c.id === formData.client_id);
   const selectedBarber = barbers.find(b => b.id === formData.barber_id);
 
   const calculateTotal = () => {
@@ -390,10 +426,15 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       disabled={loading}
                     />
                   
-                  {showClientDropdown && clientSearch && (
+                  {showClientDropdown && (clientSearch || displayClients.length > 0) && (
                       <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto">
-                        {filteredClients.length > 0 ? (
-                          filteredClients.map((client) => (
+                        {searchingClients ? (
+                          <div className="py-2 pl-3 pr-9 text-gray-500 flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                            Buscando clientes...
+                          </div>
+                        ) : displayClients.length > 0 ? (
+                          displayClients.map((client) => (
                             <div
                               key={client.id}
                               className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100"
@@ -405,9 +446,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                               )}
                             </div>
                           ))
+                        ) : clientSearch ? (
+                          <div className="py-2 pl-3 pr-9 text-gray-500">
+                            Nenhum cliente encontrado para "{clientSearch}"
+                          </div>
                         ) : (
                           <div className="py-2 pl-3 pr-9 text-gray-500">
-                            Nenhum cliente encontrado
+                            Digite para buscar clientes...
                           </div>
                         )}
                       </div>

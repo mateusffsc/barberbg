@@ -144,7 +144,7 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
         <div className="relative">
           {/* Linhas de horário */}
           {hoursRange.map(hour => (
-            <div key={hour} className="relative border-b border-gray-100">
+            <div key={hour} className="relative">
               {/* Linha do horário */}
               <div 
                 className="flex items-start min-h-[50px] cursor-pointer hover:bg-gray-50 transition-colors active:bg-gray-100"
@@ -166,13 +166,25 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
             </div>
           ))}
 
+          {/* Linhas inteiras de cada hora (sem acumular borda por linha) */}
+          <div className="absolute inset-0 pointer-events-none z-0">
+            <div className="relative ml-12">
+              {hoursRange.map((hour, idx) => (
+                <div
+                  key={`hour-line-${hour}`}
+                  className="absolute left-0 right-0 border-t border-gray-100"
+                  style={{ top: `${idx * 50}px` }}
+                />
+              ))}
+            </div>
+          </div>
+
           {/* Eventos sobrepostos */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="relative ml-12"> {/* Offset reduzido para mobile */}
               {dayEvents.map(event => {
                 const style = getEventStyle(event);
                 const colorClass = getEventColor(event.resource.status);
-                const primaryService = !event.resource.isBlock ? (event.resource.services?.[0] || null) : null;
                 
                 return (
                   <div
@@ -187,7 +199,7 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
                       {/* Horário + Cliente (se não for bloqueio) */}
                       <div className="text-xs font-medium opacity-95 mb-0.5 leading-tight flex-shrink-0 truncate">
                         {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
-                        {!event.resource.isBlock && ` - ${event.resource.client}${primaryService ? ` - ${primaryService}` : ''}`}
+                        {!event.resource.isBlock && ` - ${event.resource.client}`}
                       </div>
 
                       {/* Título do Bloqueio - apenas para bloqueios */}
@@ -224,23 +236,23 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
               })}
             </div>
           </div>
+
+          {/* Linha do horário atual (se for hoje) - dentro da grade para alinhamento exato */}
+          {moment(date).format('YYYY-MM-DD') === moment().format('YYYY-MM-DD') && (
+            <div 
+              className="absolute left-12 right-0 border-t-2 border-red-500 z-20 pointer-events-none"
+              style={{
+                top: `${((moment().hours() * 60 + moment().minutes() - startHour * 60) / 60) * 50}px`
+              }}
+            >
+              <div className="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full shadow-sm"></div>
+              <div className="absolute -right-2 -top-2 bg-red-500 text-white text-xs px-1 py-0.5 rounded text-center shadow-sm">
+                {moment().format('HH:mm')}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Linha do horário atual (se for hoje) - otimizada para mobile */}
-      {moment(date).format('YYYY-MM-DD') === moment().format('YYYY-MM-DD') && (
-        <div 
-          className="absolute left-12 right-0 border-t-2 border-red-500 z-20 pointer-events-none"
-          style={{
-            top: `${((moment().hours() * 60 + moment().minutes() - startHour * 60) / 60) * 50 + 56}px` // Ajustado para altura reduzida
-          }}
-        >
-          <div className="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full shadow-sm"></div>
-          <div className="absolute -right-2 -top-2 bg-red-500 text-white text-xs px-1 py-0.5 rounded text-center shadow-sm">
-            {moment().format('HH:mm')}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

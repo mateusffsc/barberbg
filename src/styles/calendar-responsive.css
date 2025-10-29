@@ -747,3 +747,12 @@
   margin: 0 !important;
   line-height: 1.1 !important;
 }
+
+/* Preencher toda a largura no mobile: remover borda/raio/sombra do container */
+@media (max-width: 1024px) {
+  .rbc-calendar {
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
