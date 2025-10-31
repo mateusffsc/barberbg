@@ -4,6 +4,7 @@ import { CalendarEvent } from '../../types/appointment';
 import { PaymentMethod, MultiplePaymentInfo } from '../../types/payment';
 import { PaymentConfirmationModal } from '../ui/PaymentConfirmationModal';
 import { formatCurrency } from '../../utils/formatters';
+import { toLocalISOString, fromLocalDateTimeString, toLocalDateString, toLocalTimeString } from '../../utils/dateHelpers';
 import { Client } from '../../types/client';
 import { Barber } from '../../types/barber';
 import { Service } from '../../types/service';
@@ -110,7 +111,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         client_id: event.resource.appointment?.client_id || 0,
         barber_id: event.resource.appointment?.barber_id || 0,
         service_ids: event.resource.appointment?.services?.map(s => s.id) || [],
-        appointment_date: appointmentDate.toISOString().split('T')[0],
+        appointment_date: toLocalDateString(appointmentDate),
         appointment_time: appointmentDate.toLocaleTimeString('pt-BR', { 
           hour: '2-digit', 
           minute: '2-digit',
@@ -401,7 +402,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         client_id: event.resource.appointment.client_id || 0,
         barber_id: event.resource.appointment.barber_id || 0,
         service_ids: event.resource.appointment.services?.map(s => s.id) || [],
-        appointment_date: appointmentDate.toISOString().split('T')[0],
+        appointment_date: toLocalDateString(appointmentDate),
         appointment_time: appointmentDate.toLocaleTimeString('pt-BR', { 
           hour: '2-digit', 
           minute: '2-digit',

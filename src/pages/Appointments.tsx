@@ -16,7 +16,7 @@ import { Product } from '../types/product';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
-import { fromLocalDateTimeString, toLocalISOString } from '../utils/dateHelpers';
+import { fromLocalDateTimeString, toLocalISOString, toLocalDateString, toLocalTimeString } from '../utils/dateHelpers';
 
 export const Appointments: React.FC = () => {
   const { user } = useAuth();
@@ -457,9 +457,9 @@ export const Appointments: React.FC = () => {
         }
 
         // Verificar bloqueios de agenda no período
-        const appointmentDateStr = appointmentStart.toISOString().split('T')[0];
-        const appointmentTimeStr = appointmentStart.toTimeString().split(' ')[0];
-        const appointmentEndTimeStr = appointmentEnd.toTimeString().split(' ')[0];
+        const appointmentDateStr = toLocalDateString(appointmentStart);
+        const appointmentTimeStr = toLocalTimeString(appointmentStart);
+        const appointmentEndTimeStr = toLocalTimeString(appointmentEnd);
 
         const { data: blocks } = await supabase
           .from('schedule_blocks')

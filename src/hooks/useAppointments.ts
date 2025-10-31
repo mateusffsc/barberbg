@@ -6,7 +6,7 @@ import { Service } from '../types/service';
 import { Barber } from '../types/barber';
 import { PaymentMethod } from '../types/payment';
 import { useAuth } from '../contexts/AuthContext';
-import { fromLocalDateTimeString, toLocalISOString } from '../utils/dateHelpers';
+import { fromLocalDateTimeString, toLocalISOString, toLocalDateString, toLocalTimeString } from '../utils/dateHelpers';
 import toast from 'react-hot-toast';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
 
@@ -327,9 +327,9 @@ export const useAppointments = () => {
           .lt('appointment_datetime', toLocalISOString(endTime));
 
         // Verificar conflitos com bloqueios de agenda
-        const appointmentDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
-        const appointmentTime = startTime.toTimeString().split(' ')[0]; // HH:MM:SS
-        const appointmentEndTime = endTime.toTimeString().split(' ')[0]; // HH:MM:SS
+        const appointmentDate = toLocalDateString(startTime); // YYYY-MM-DD
+        const appointmentTime = toLocalTimeString(startTime); // HH:MM:SS
+        const appointmentEndTime = toLocalTimeString(endTime); // HH:MM:SS
 
         const { data: blocks } = await supabase
           .from('schedule_blocks')
@@ -397,8 +397,8 @@ export const useAppointments = () => {
             services_names: selectedServices.map(s => s.name).join(', '),
             services_ids: selectedServices.map(s => s.id),
             appointment_datetime: toLocalISOString(date),
-            appointment_date: date.toISOString().split('T')[0], // YYYY-MM-DD
-            appointment_time: date.toTimeString().split(' ')[0], // HH:MM:SS
+            appointment_date: toLocalDateString(date), // YYYY-MM-DD local
+            appointment_time: toLocalTimeString(date), // HH:MM:SS local
             status: 'scheduled',
             total_price: totalPrice,
             duration_minutes: totalDuration, // Salvar duração calculada (customizada ou padrão)
