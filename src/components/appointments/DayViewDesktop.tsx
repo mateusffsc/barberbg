@@ -21,9 +21,9 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
 }) => {
   const { user } = useAuth();
   
-  // Horários de funcionamento (8h às 22h)
+  // Horários de funcionamento (8h às 00h)
   const startHour = 8;
-  const endHour = 22;
+  const endHour = 24; // 24h = 00:00 (meia-noite)
   const hoursRange = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
 
   // Filtrar eventos do dia selecionado
@@ -137,7 +137,7 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
             {hoursRange.map(hour => (
               <div key={hour} className="h-20 border-b border-gray-100 flex items-center justify-center relative">
                 <span className="text-sm font-medium text-gray-600">
-                  {String(hour).padStart(2, '0')}:00
+                  {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
                 </span>
                 {/* Linha de meia hora na coluna de horários */}
                 <div className="absolute top-1/2 left-2 right-2 border-t border-gray-200 border-dashed opacity-40"></div>

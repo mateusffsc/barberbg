@@ -16,9 +16,9 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
   onSelectEvent,
   onSelectSlot
 }) => {
-  // Horários de funcionamento (8h às 22h)
+  // Horários de funcionamento (8h às 00h)
   const startHour = 8;
-  const endHour = 22;
+  const endHour = 24; // 24h = 00:00 (meia-noite)
   const hoursRange = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
 
   // Filtrar eventos do dia selecionado
@@ -153,7 +153,7 @@ export const DayViewCalendar: React.FC<DayViewCalendarProps> = ({
                 {/* Coluna do horário - reduzida para mobile */}
                 <div className="w-12 flex-shrink-0 p-1.5 text-right border-r border-gray-200">
                   <span className="text-xs font-medium text-gray-600">
-                    {String(hour).padStart(2, '0')}:00
+                    {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
                   </span>
                 </div>
                 
