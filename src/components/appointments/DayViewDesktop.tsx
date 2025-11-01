@@ -21,8 +21,8 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
 }) => {
   const { user } = useAuth();
   
-  // Horários de funcionamento (8h às 00h)
-  const startHour = 8;
+  // Horários de funcionamento (7h às 00h)
+  const startHour = 7;
   const endHour = 24; // 24h = 00:00 (meia-noite)
   const hoursRange = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
 

@@ -146,7 +146,7 @@ export const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
   // Configuração de horário comercial
   const minTime = new Date();
-  minTime.setHours(8, 0, 0);
+  minTime.setHours(7, 0, 0); // A partir das 7:00
 
   const maxTime = new Date();
   maxTime.setHours(23, 59, 59); // Até meia-noite
