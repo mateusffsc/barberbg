@@ -48,6 +48,9 @@ export const Appointments: React.FC = () => {
     fetchBarbers
   } = useBarbers();
 
+  // Exibir todos os barbeiros cadastrados, exceto o barbeiro "rose"
+  const filteredBarbers = barbers.filter(b => (b.name || '').toLowerCase() !== 'rose');
+
   const {
     services,
     setServices,
@@ -937,7 +940,7 @@ export const Appointments: React.FC = () => {
                   className="w-full px-2 py-1 border border-gray-300 rounded bg-white text-xs focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-transparent"
                 >
                   <option value="">Todos</option>
-                  {barbers.map((barber) => (
+                  {filteredBarbers.map((barber) => (
                     <option key={barber.id} value={barber.id}>
                       {barber.name}
                     </option>
@@ -975,7 +978,7 @@ export const Appointments: React.FC = () => {
                 onDeleteAppointment={handleDeleteAppointment}
                 onDeleteBlock={handleDeleteBlock}
                 loading={isLoading}
-                barbers={barbers}
+                barbers={filteredBarbers}
                 selectedDate={selectedCalendarDate}
                 instantBlockDeletion={true}
               />
@@ -1025,7 +1028,7 @@ export const Appointments: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 >
                   <option value="">Todos os barbeiros</option>
-                  {barbers.map((barber) => (
+                  {filteredBarbers.map((barber) => (
                     <option key={barber.id} value={barber.id}>
                       {barber.name}
                     </option>
@@ -1056,7 +1059,7 @@ export const Appointments: React.FC = () => {
                 onDeleteAppointment={handleDeleteAppointment}
                 onDeleteBlock={handleDeleteBlock}
                 loading={isLoading}
-                barbers={barbers}
+                barbers={filteredBarbers}
                 selectedDate={selectedCalendarDate}
                 instantBlockDeletion={true}
               />
@@ -1072,7 +1075,7 @@ export const Appointments: React.FC = () => {
         onSubmit={handleModalSubmit}
         clients={clients}
         setClients={setClients}
-        barbers={barbers}
+        barbers={filteredBarbers}
         services={services}
         selectedDate={selectedDate}
         loading={modalLoading}
@@ -1090,7 +1093,7 @@ export const Appointments: React.FC = () => {
         onUpdateRecurringAppointments={updateRecurringAppointments}
         canChangeStatus={true}
         clients={clients}
-        barbers={barbers}
+        barbers={filteredBarbers}
         services={services}
       />
 

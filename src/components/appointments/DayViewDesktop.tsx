@@ -31,10 +31,12 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
     moment(event.start).format('YYYY-MM-DD') === moment(date).format('YYYY-MM-DD')
   );
 
-  // Filtrar barbeiros baseado no tipo de usuário
-  const filteredBarbers = user?.role === 'barber' 
-    ? barbers.filter(barber => barber.id === user.barber?.id?.toString())
-    : barbers.slice(0, 9); // Limitar a apenas 9 barbeiros
+  // Filtrar barbeiros baseado no tipo de usuário e remover o barbeiro "rose"
+  const filteredBarbers = (
+    user?.role === 'barber'
+      ? barbers.filter(barber => barber.id === user.barber?.id?.toString())
+      : barbers
+  ).filter(b => (b.name || '').toLowerCase() !== 'rose');
 
   // Agrupar eventos por barbeiro
   const eventsByBarber = filteredBarbers.reduce((acc, barber) => {

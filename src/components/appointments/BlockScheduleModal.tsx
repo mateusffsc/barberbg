@@ -43,6 +43,9 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
 
+  // Exibir lista de barbeiros sem o barbeiro "rose"
+  const displayBarbers = barbers.filter(b => (b.name || '').toLowerCase() !== 'rose');
+
   // Carregar barbeiros quando o modal abrir
   useEffect(() => {
     if (isOpen) {
@@ -236,7 +239,7 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   >
                     <option value="ALL">Todos os barbeiros</option>
-                    {barbers.map((barber) => (
+                    {displayBarbers.map((barber) => (
                       <option key={barber.id} value={barber.id}>
                         {barber.name}
                       </option>
