@@ -7,11 +7,15 @@ import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../types/payment
 interface SalesTableProps {
   sales: Sale[];
   loading: boolean;
+  onEditSale?: (sale: Sale) => void;
+  onDeleteSale?: (sale: Sale) => void;
 }
 
 export const SalesTable: React.FC<SalesTableProps> = ({
   sales,
-  loading
+  loading,
+  onEditSale,
+  onDeleteSale
 }) => {
   if (loading) {
     return (
@@ -68,6 +72,9 @@ export const SalesTable: React.FC<SalesTableProps> = ({
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Forma de Pagamento
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ações
               </th>
             </tr>
           </thead>
@@ -133,6 +140,24 @@ export const SalesTable: React.FC<SalesTableProps> = ({
                     <span className="mr-1">{getPaymentMethodIcon(sale.payment_method)}</span>
                     {getPaymentMethodLabel(sale.payment_method)}
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onEditSale && onEditSale(sale)}
+                      className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-100 text-gray-700"
+                      title="Editar valor da venda"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => onDeleteSale && onDeleteSale(sale)}
+                      className="px-2 py-1 text-xs rounded border border-red-300 hover:bg-red-50 text-red-700"
+                      title="Excluir venda"
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

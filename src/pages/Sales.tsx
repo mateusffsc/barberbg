@@ -7,8 +7,10 @@ import { useBarbers } from '../hooks/useBarbers';
 import { ProductGrid } from '../components/sales/ProductGrid';
 import { ShoppingCart as Cart } from '../components/sales/ShoppingCart';
 import { SalesTable } from '../components/sales/SalesTable';
+import EditSaleItemsModal from '../components/sales/EditSaleItemsModal';
+import ConfirmDeleteSaleModal from '../components/sales/ConfirmDeleteSaleModal';
 import { Pagination } from '../components/ui/Pagination';
-import { CartItem } from '../types/sale';
+import { CartItem, Sale } from '../types/sale';
 import { Product } from '../types/product';
 import { Client } from '../types/client';
 import { Barber } from '../types/barber';
@@ -26,7 +28,10 @@ export const Sales: React.FC = () => {
     totalCount, 
     setTotalCount,
     fetchSales, 
-    createSale 
+    createSale,
+    updateSaleAmount,
+    updateSaleItemsAmounts,
+    deleteSale
   } = useSales();
   const { 
     products, 
@@ -57,6 +62,12 @@ export const Sales: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pdv' | 'historico'>('pdv');
   const [currentPage, setCurrentPage] = useState(1);
   const [salesSearch, setSalesSearch] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [saleToEdit, setSaleToEdit] = useState<Sale | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const pageSize = 10;
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -148,6 +159,44 @@ export const Sales: React.FC = () => {
   const handleSalesSearch = (value: string) => {
     setSalesSearch(value);
     setCurrentPage(1);
+  };
+
+  const handleOpenEdit = (sale: Sale) => {
+    setSaleToEdit(sale);
+    setEditOpen(true);
+  };
+
+  const handleOpenDelete = (sale: Sale) => {
+    setSaleToDelete(sale);
+    setDeleteOpen(true);
+  };
+
+  const handleSubmitEdit = async (updates: Array<{ productId: number; newSubtotal: number }>) => {
+    if (!saleToEdit) return;
+    try {
+      setSavingEdit(true);
+      const updated = await updateSaleItemsAmounts(saleToEdit.id, updates);
+      if (updated) {
+        setEditOpen(false);
+        setSaleToEdit(null);
+      }
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!saleToDelete) return;
+    try {
+      setDeleting(true);
+      const ok = await deleteSale(saleToDelete.id);
+      if (ok) {
+        setDeleteOpen(false);
+        setSaleToDelete(null);
+      }
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleAddToCart = (product: Product) => {
@@ -404,6 +453,8 @@ export const Sales: React.FC = () => {
         <SalesTable
           sales={sales}
           loading={salesLoading}
+          onEditSale={handleOpenEdit}
+          onDeleteSale={handleOpenDelete}
         />
 
         {totalPages > 1 && (
@@ -417,6 +468,22 @@ export const Sales: React.FC = () => {
         )}
         </>
       )}
+
+      <EditSaleItemsModal
+        isOpen={editOpen}
+        sale={saleToEdit}
+        onClose={() => { setEditOpen(false); setSaleToEdit(null); }}
+        onSubmit={handleSubmitEdit}
+        loading={savingEdit}
+      />
+
+      <ConfirmDeleteSaleModal
+        isOpen={deleteOpen}
+        sale={saleToDelete}
+        onClose={() => { setDeleteOpen(false); setSaleToDelete(null); }}
+        onConfirm={handleConfirmDelete}
+        loading={deleting}
+      />
 
     </div>
   );

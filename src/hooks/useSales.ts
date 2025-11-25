@@ -189,6 +189,165 @@ export const useSales = () => {
     }
   };
 
+  const updateSaleItemsAmounts = async (
+    saleId: number,
+    updates: Array<{ productId: number; newSubtotal: number }>
+  ): Promise<Sale | null> => {
+    try {
+      if (!updates || updates.length === 0) {
+        toast.error('Nenhuma alteração informada');
+        return null;
+      }
+
+      // Buscar venda atual no estado para obter quantidades
+      const existing = sales.find(s => s.id === saleId);
+      if (!existing) {
+        toast.error('Venda não encontrada');
+        return null;
+      }
+
+      const qtyMap = new Map<number, number>();
+      (existing.products || []).forEach(p => qtyMap.set(p.id, p.quantity));
+
+      // Validar e calcular preços unitários novos
+      const unitUpdates = updates.map(u => {
+        const qty = qtyMap.get(u.productId) || 0;
+        if (qty <= 0) {
+          throw new Error('Quantidade inválida para algum produto');
+        }
+        if (u.newSubtotal <= 0) {
+          throw new Error('Subtotal deve ser maior que zero');
+        }
+        const unitPrice = Number((u.newSubtotal / qty).toFixed(2));
+        return { productId: u.productId, unitPrice };
+      });
+
+      // Atualizar cada item em sale_products
+      for (const upd of unitUpdates) {
+        const { error: upErr } = await supabase
+          .from('sale_products')
+          .update({ price_at_sale: upd.unitPrice })
+          .eq('sale_id', saleId)
+          .eq('product_id', upd.productId);
+        if (upErr) throw upErr;
+      }
+
+      // Calcular novo total
+      const newTotal = updates.reduce((sum, u) => sum + u.newSubtotal, 0);
+
+      // Atualizar total em sales e retornar venda atualizada
+      const { data, error } = await supabase
+        .from('sales')
+        .update({ total_amount: newTotal })
+        .eq('id', saleId)
+        .select(`
+          *,
+          client:clients(id, name),
+          barber:barbers(id, name),
+          sale_products(
+            quantity,
+            price_at_sale,
+            product:products(id, name)
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      const updatedSale: Sale = {
+        ...data,
+        products: (data?.sale_products || []).map((sp: any) => ({
+          id: sp.product.id,
+          name: sp.product.name,
+          quantity: sp.quantity,
+          price: sp.price_at_sale
+        }))
+      };
+
+      setSales(prev => prev.map(s => (s.id === saleId ? updatedSale : s)));
+      toast.success('Valores por produto atualizados com sucesso!');
+      return updatedSale;
+    } catch (error: any) {
+      console.error('Erro ao atualizar itens da venda:', error);
+      toast.error(error?.message || 'Erro ao atualizar itens da venda');
+      return null;
+    }
+  };
+
+  const deleteSale = async (saleId: number): Promise<boolean> => {
+    try {
+      // Excluir itens vinculados primeiro (seguro caso não exista CASCADE)
+      const { error: spErr } = await supabase
+        .from('sale_products')
+        .delete()
+        .eq('sale_id', saleId);
+      if (spErr) throw spErr;
+
+      // Excluir a venda
+      const { error: sErr } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', saleId);
+      if (sErr) throw sErr;
+
+      // Atualizar estado local
+      setSales(prev => prev.filter(s => s.id !== saleId));
+      setTotalCount(prev => Math.max(0, prev - 1));
+      toast.success('Venda excluída com sucesso');
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao excluir venda:', error);
+      toast.error(error?.message || 'Erro ao excluir venda');
+      return false;
+    }
+  };
+
+  const updateSaleAmount = async (saleId: number, newAmount: number): Promise<Sale | null> => {
+    try {
+      if (newAmount <= 0) {
+        toast.error('O valor da venda deve ser maior que zero');
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('sales')
+        .update({ total_amount: newAmount })
+        .eq('id', saleId)
+        .select(`
+          *,
+          client:clients(id, name),
+          barber:barbers(id, name),
+          sale_products(
+            quantity,
+            price_at_sale,
+            product:products(id, name)
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      const updatedSale: Sale = {
+        ...data,
+        products: (data?.sale_products || []).map((sp: any) => ({
+          id: sp.product.id,
+          name: sp.product.name,
+          quantity: sp.quantity,
+          price: sp.price_at_sale
+        }))
+      };
+
+      // Atualizar estado local
+      setSales(prev => prev.map(s => (s.id === saleId ? updatedSale : s)));
+      toast.success('Valor da venda atualizado com sucesso!');
+      return updatedSale;
+    } catch (error) {
+      console.error('Erro ao atualizar valor da venda:', error);
+      toast.error('Erro ao atualizar valor da venda');
+      return null;
+    }
+  };
+
   return {
     sales,
     setSales,
@@ -197,6 +356,9 @@ export const useSales = () => {
     totalCount,
     setTotalCount,
     fetchSales,
-    createSale
+    createSale,
+    updateSaleItemsAmounts,
+    deleteSale,
+    updateSaleAmount
   };
 };
