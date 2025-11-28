@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fromLocalDateTimeString, toLocalISOString, toLocalDateString, toLocalTimeString } from '../utils/dateHelpers';
 import toast from 'react-hot-toast';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
+import { safeRandomUUID } from '../utils/uuid';
 
 export const useAppointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -381,7 +382,8 @@ export const useAppointments = () => {
       let firstAppointment = null;
       
       // Gerar UUID para agrupar agendamentos recorrentes (apenas se houver mais de um)
-      const recurrenceGroupId = appointmentDates.length > 1 ? crypto.randomUUID() : null;
+      // Usa fallback compatível com Safari/iMac antigos
+      const recurrenceGroupId = appointmentDates.length > 1 ? safeRandomUUID() : null;
       
       for (const date of appointmentDates) {
         // Criar agendamento
