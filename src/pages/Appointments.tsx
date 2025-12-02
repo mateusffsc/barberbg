@@ -8,6 +8,7 @@ import { AppointmentCalendar } from '../components/appointments/AppointmentCalen
 import { AppointmentModal } from '../components/appointments/AppointmentModal';
 import { AppointmentDetailsModal } from '../components/appointments/AppointmentDetailsModal';
 import { PaymentMethodModal } from '../components/ui/PaymentMethodModal';
+import { PasswordPromptModal } from '../components/ui/PasswordPromptModal';
 import { ConflictModal } from '../components/appointments/ConflictModal';
 import { BlockScheduleModal } from '../components/appointments/BlockScheduleModal';
 import { CalendarEvent } from '../types/appointment';
@@ -676,17 +677,33 @@ export const Appointments: React.FC = () => {
     setPaymentModalOpen(true);
   };
 
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
+
   const handlePaymentSelection = async (paymentMethod: PaymentMethod) => {
     if (!appointmentToComplete) return;
+    // Fechar seleção de pagamento e abrir modal de senha
+    setPendingPaymentMethod(paymentMethod);
+    setPaymentModalOpen(false);
+    setPasswordModalOpen(true);
+  };
 
+  const handleConfirmPasswordComplete = async () => {
+    if (!appointmentToComplete || !pendingPaymentMethod) return;
     setModalLoading(true);
     try {
-      await handleStatusChange(appointmentToComplete.resource.appointment.id, 'completed', paymentMethod);
+      await handleStatusChange(
+        appointmentToComplete.resource.appointment.id,
+        'completed',
+        pendingPaymentMethod
+      );
       toast.success('Agendamento finalizado com sucesso!');
     } catch (error) {
       toast.error('Erro ao finalizar agendamento');
     } finally {
-      setPaymentModalOpen(false);
+      setModalLoading(false);
+      setPasswordModalOpen(false);
+      setPendingPaymentMethod(null);
       setAppointmentToComplete(null);
     }
   };
@@ -1106,6 +1123,17 @@ export const Appointments: React.FC = () => {
         onSelect={handlePaymentSelection}
         title="Finalizar Agendamento"
         amount={appointmentToComplete?.resource.total || 0}
+        loading={modalLoading}
+      />
+
+      <PasswordPromptModal
+        isOpen={passwordModalOpen}
+        onClose={() => {
+          setPasswordModalOpen(false);
+          setPendingPaymentMethod(null);
+        }}
+        onConfirm={handleConfirmPasswordComplete}
+        title="Digite a senha para concluir"
         loading={modalLoading}
       />
 
