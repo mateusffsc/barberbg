@@ -1103,7 +1103,7 @@ export const Appointments: React.FC = () => {
         onClose={() => setIsDetailsModalOpen(false)}
         event={selectedEvent}
         onStatusChange={handleStatusChange}
-        onUpdateAppointment={updateAppointment}
+        onUpdateAppointment={handleUpdateAppointment}
         onDeleteBlock={handleDeleteBlock}
         onDeleteAppointment={handleDeleteAppointment}
         onDeleteRecurringAppointments={deleteRecurringAppointments}
@@ -1154,7 +1154,7 @@ export const Appointments: React.FC = () => {
   );
 };
 
-const updateAppointment = async (appointmentId: number, updateData: any) => {
+const handleUpdateAppointment = async (appointmentId: number, updateData: any) => {
   try {
     const success = await updateAppointment(appointmentId, updateData);
     if (success) {
