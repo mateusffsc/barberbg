@@ -3,7 +3,6 @@ import { X, Calendar, Clock, User, UserCheck, Scissors, FileText, DollarSign, Ch
 import { CalendarEvent } from '../../types/appointment';
 import { PaymentMethod, MultiplePaymentInfo } from '../../types/payment';
 import { PaymentConfirmationModal } from '../ui/PaymentConfirmationModal';
-import { PasswordPromptModal } from '../ui/PasswordPromptModal';
 import { formatCurrency } from '../../utils/formatters';
 import { toLocalISOString, fromLocalDateTimeString, toLocalDateString, toLocalTimeString } from '../../utils/dateHelpers';
 import { Client } from '../../types/client';
@@ -383,21 +382,11 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     setShowPaymentModal(true);
   };
 
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [pendingCompletion, setPendingCompletion] = useState<{ method: PaymentMethod; finalAmount: number; soldProducts?: { product: Product; quantity: number }[] } | null>(null);
-
   const handlePaymentMethodSelect = (payments: MultiplePaymentInfo[], finalAmount: number, soldProducts?: { product: Product; quantity: number }[]) => {
     setShowPaymentModal(false);
+    // Para manter compatibilidade, usamos o primeiro método de pagamento
     const primaryPayment = payments[0];
-    setPendingCompletion({ method: primaryPayment.method, finalAmount, soldProducts });
-    setShowPasswordModal(true);
-  };
-
-  const handleConfirmPassword = async () => {
-    if (!pendingCompletion) return;
-    await handleStatusChange('completed', pendingCompletion.method, pendingCompletion.finalAmount);
-    setShowPasswordModal(false);
-    setPendingCompletion(null);
+    handleStatusChange('completed', primaryPayment.method, finalAmount, soldProducts);
   };
 
   const handleEdit = () => {
@@ -905,14 +894,6 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
         appointmentId={event.resource.appointment.id}
         barberId={event.resource.appointment.barber_id}
         clientId={event.resource.appointment.client_id}
-      />
-
-      <PasswordPromptModal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        onConfirm={handleConfirmPassword}
-        title="Digite a senha para concluir"
-        loading={updating}
       />
 
       {/* Modal de Confirmação de Exclusão */}
