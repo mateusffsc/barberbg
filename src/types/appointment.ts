@@ -24,6 +24,7 @@ export interface Appointment {
   note?: string; // Observações do agendamento
   payment_method?: PaymentMethod;
   recurrence_group_id?: string; // UUID que agrupa agendamentos recorrentes
+  reminder_sent?: boolean; // Controle de lembrete enviado
   created_at: string;
   updated_at: string;
   // Relacionamentos (opcionais para compatibilidade)

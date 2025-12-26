@@ -570,6 +570,28 @@ export const useAppointments = () => {
     }
   };
 
+  // Marcar lembrete como enviado para um agendamento
+  const markReminderSent = async (id: number): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ reminder_sent: true })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Lembrete marcado como enviado');
+      // Opcional: recarregar lista para refletir alteração
+      await notifyAppointmentsChange();
+      await reloadAppointments();
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao marcar lembrete como enviado:', error);
+      toast.error('Erro ao atualizar status de lembrete');
+      return false;
+    }
+  };
+
   const rescheduleAppointment = async (id: number, newDateTime: string): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -1258,6 +1280,7 @@ export const useAppointments = () => {
     convertToCalendarEvents,
     createScheduleBlock,
     deleteScheduleBlock,
+    markReminderSent,
     reloadAppointments
   };
 };
