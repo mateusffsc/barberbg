@@ -57,10 +57,12 @@ export const useAppointments = () => {
 
   const getEffectiveFilters = useCallback(() => {
     const now = new Date();
-    const startDate = lastFiltersRef.current.startDate ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const endLimit = new Date(startDate);
-    endLimit.setDate(endLimit.getDate() + 60);
-    const endDate = lastFiltersRef.current.endDate ?? new Date(endLimit.getFullYear(), endLimit.getMonth(), endLimit.getDate(), 23, 59, 59, 999);
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    defaultStart.setDate(defaultStart.getDate() - 7);
+    const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    defaultEnd.setDate(defaultEnd.getDate() + 60);
+    const startDate = lastFiltersRef.current.startDate ?? defaultStart;
+    const endDate = lastFiltersRef.current.endDate ?? new Date(defaultEnd.getFullYear(), defaultEnd.getMonth(), defaultEnd.getDate(), 23, 59, 59, 999);
     const barberId = lastFiltersRef.current.barberId ?? (user?.role === 'barber' ? user.barber?.id : undefined);
     return { startDate, endDate, barberId };
   }, [user]);
@@ -240,7 +242,8 @@ export const useAppointments = () => {
       lastFiltersRef.current = { startDate, endDate, barberId };
       const now = new Date();
       const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      const defaultEnd = new Date(defaultStart);
+      defaultStart.setDate(defaultStart.getDate() - 7);
+      const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       defaultEnd.setDate(defaultEnd.getDate() + 60);
       const effectiveStart = startDate ?? defaultStart;
       const effectiveEnd = endDate ?? new Date(defaultEnd.getFullYear(), defaultEnd.getMonth(), defaultEnd.getDate(), 23, 59, 59, 999);
