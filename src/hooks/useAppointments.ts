@@ -57,8 +57,10 @@ export const useAppointments = () => {
 
   const getEffectiveFilters = useCallback(() => {
     const now = new Date();
-    const startDate = lastFiltersRef.current.startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
-    const endDate = lastFiltersRef.current.endDate ?? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const startDate = lastFiltersRef.current.startDate ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endLimit = new Date(startDate);
+    endLimit.setDate(endLimit.getDate() + 60);
+    const endDate = lastFiltersRef.current.endDate ?? new Date(endLimit.getFullYear(), endLimit.getMonth(), endLimit.getDate(), 23, 59, 59, 999);
     const barberId = lastFiltersRef.current.barberId ?? (user?.role === 'barber' ? user.barber?.id : undefined);
     return { startDate, endDate, barberId };
   }, [user]);
@@ -237,8 +239,11 @@ export const useAppointments = () => {
       // Persistir filtros atuais sempre que buscar
       lastFiltersRef.current = { startDate, endDate, barberId };
       const now = new Date();
-      const effectiveStart = startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
-      const effectiveEnd = endDate ?? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const defaultEnd = new Date(defaultStart);
+      defaultEnd.setDate(defaultEnd.getDate() + 60);
+      const effectiveStart = startDate ?? defaultStart;
+      const effectiveEnd = endDate ?? new Date(defaultEnd.getFullYear(), defaultEnd.getMonth(), defaultEnd.getDate(), 23, 59, 59, 999);
       // Função para buscar uma página de agendamentos
       const fetchPage = async (from: number, to: number) => {
         let query = supabase
@@ -1150,9 +1155,12 @@ export const useAppointments = () => {
   // Buscar bloqueios de agenda
   const loadScheduleBlocks = async (barberId?: number) => {
     try {
+      const { startDate, endDate } = getEffectiveFilters();
       let query = supabase
         .from('schedule_blocks')
         .select('*')
+        .gte('block_date', toLocalDateString(startDate))
+        .lte('block_date', toLocalDateString(endDate))
         .order('block_date', { ascending: true });
 
       // Se um barbeiro específico foi selecionado, filtrar bloqueios
