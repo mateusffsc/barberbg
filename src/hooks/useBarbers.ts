@@ -42,7 +42,14 @@ export const useBarbers = () => {
       let query = supabase
         .from('barbers')
         .select(`
-          *,
+          id,
+          name,
+          phone,
+          email,
+          is_special_barber,
+          commission_rate_service,
+          commission_rate_product,
+          commission_rate_chemical_service,
           user:users(id, username, role)
         `, { count: 'exact' })
         .range(from, to)

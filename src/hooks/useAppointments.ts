@@ -55,27 +55,112 @@ export const useAppointments = () => {
     }, delayMs);
   }, [reloadAppointments]);
 
+  const getEffectiveFilters = useCallback(() => {
+    const now = new Date();
+    const startDate = lastFiltersRef.current.startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
+    const endDate = lastFiltersRef.current.endDate ?? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const barberId = lastFiltersRef.current.barberId ?? (user?.role === 'barber' ? user.barber?.id : undefined);
+    return { startDate, endDate, barberId };
+  }, [user]);
+
+  const isRowWithinFilters = useCallback((row: any) => {
+    if (!row || !row.appointment_datetime) return false;
+    const { startDate, endDate, barberId } = getEffectiveFilters();
+    const dt = new Date(row.appointment_datetime);
+    const inRange = dt >= startDate && dt <= endDate;
+    const barberOk = barberId ? row.barber_id === barberId : true;
+    return inRange && barberOk;
+  }, [getEffectiveFilters]);
+
+  const fetchAppointmentById = useCallback(async (id: number) => {
+    const { data } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        client:clients(id, name),
+        barber:barbers(id, name, is_special_barber),
+        appointment_services(
+          service_id,
+          price_at_booking,
+          commission_rate_applied,
+          service:services(id, name, duration_minutes_normal, duration_minutes_special, is_chemical)
+        )
+      `)
+      .eq('id', id)
+      .single();
+    if (!data) return null;
+    return {
+      ...data,
+      services: data.appointment_services?.map((as: any) => ({
+        id: as.service.id,
+        name: as.service.name,
+        duration_minutes_normal: as.service.duration_minutes_normal,
+        duration_minutes_special: as.service.duration_minutes_special,
+        is_chemical: as.service.is_chemical,
+        price_at_booking: as.price_at_booking,
+        commission_rate_applied: as.commission_rate_applied
+      })) || []
+    };
+  }, []);
+
+  const sortAppointmentsAsc = useCallback((list: any[]) => {
+    return [...list].sort((a, b) => new Date(a.appointment_datetime).getTime() - new Date(b.appointment_datetime).getTime());
+  }, []);
+
+  const handleInsertAppointment = useCallback(async (payload: any) => {
+    const row = payload?.new;
+    if (!row) return;
+    if (!isRowWithinFilters(row)) return;
+    const full = await fetchAppointmentById(row.id);
+    if (!full) return;
+    setAppointments(prev => sortAppointmentsAsc([full, ...prev.filter(a => a.id !== full.id)]));
+    setTotalCount(prev => prev + 1);
+  }, [isRowWithinFilters, fetchAppointmentById, sortAppointmentsAsc]);
+
+  const handleUpdateAppointment = useCallback(async (payload: any) => {
+    const row = payload?.new;
+    const oldRow = payload?.old;
+    if (!row && !oldRow) return;
+    const inFilters = row ? isRowWithinFilters(row) : false;
+    if (inFilters) {
+      const full = await fetchAppointmentById(row.id);
+      if (!full) return;
+      setAppointments(prev => {
+        const idx = prev.findIndex(a => a.id === row.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = full;
+          return sortAppointmentsAsc(next);
+        }
+        return sortAppointmentsAsc([full, ...prev]);
+      });
+    } else {
+      const idToRemove = row?.id ?? oldRow?.id;
+      if (idToRemove) {
+        setAppointments(prev => prev.filter(a => a.id !== idToRemove));
+        setTotalCount(prev => Math.max(0, prev - 1));
+      }
+    }
+  }, [isRowWithinFilters, fetchAppointmentById, sortAppointmentsAsc]);
+
+  const handleDeleteAppointment = useCallback((payload: any) => {
+    const row = payload?.old;
+    if (!row || !row.id) return;
+    setAppointments(prev => prev.filter(a => a.id !== row.id));
+    setTotalCount(prev => Math.max(0, prev - 1));
+  }, []);
+
   // Configurar subscription em tempo real para appointments
   useRealtimeSubscription({
     table: 'appointments',
-    onInsert: (payload) => {
-      console.log('📥 useAppointments: INSERT em appointments:', payload);
-      debouncedReload(500);
-    },
-    onUpdate: (payload) => {
-      console.log('✏️ useAppointments: UPDATE em appointments:', payload);
-      debouncedReload(300);
-    },
-    onDelete: (payload) => {
-      console.log('🗑️ useAppointments: DELETE em appointments:', payload);
-      debouncedReload(300);
-    },
+    onInsert: handleInsertAppointment,
+    onUpdate: handleUpdateAppointment,
+    onDelete: handleDeleteAppointment,
     onChange: (payload) => {
-      // Fallback genérico
-      console.log('🔄 useAppointments: Evento genérico em appointments:', payload);
       debouncedReload(400);
     },
-    showNotifications: false // Desabilitar notificações automáticas para evitar spam
+    showNotifications: false, // Desabilitar notificações automáticas para evitar spam
+    filter: user?.role === 'barber' && user.barber?.id ? `barber_id=eq.${user.barber.id}` : undefined
   });
 
   // Assinar mudanças em bloqueios de agenda para refletir imediatamente na visão do calendário
@@ -151,6 +236,9 @@ export const useAppointments = () => {
     try {
       // Persistir filtros atuais sempre que buscar
       lastFiltersRef.current = { startDate, endDate, barberId };
+      const now = new Date();
+      const effectiveStart = startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
+      const effectiveEnd = endDate ?? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
       // Função para buscar uma página de agendamentos
       const fetchPage = async (from: number, to: number) => {
         let query = supabase
@@ -169,13 +257,9 @@ export const useAppointments = () => {
           .order('appointment_datetime')
           .range(from, to);
 
-        // Filtrar por período se fornecido
-        if (startDate) {
-          query = query.gte('appointment_datetime', startDate.toISOString());
-        }
-        if (endDate) {
-          query = query.lte('appointment_datetime', endDate.toISOString());
-        }
+        query = query
+          .gte('appointment_datetime', effectiveStart.toISOString())
+          .lte('appointment_datetime', effectiveEnd.toISOString());
 
         // Filtrar por barbeiro se fornecido ou se usuário é barbeiro
         if (barberId) {
@@ -560,7 +644,7 @@ export const useAppointments = () => {
       toast.success(statusMessages[status as keyof typeof statusMessages] || 'Status atualizado');
       // Notificar e recarregar
       await notifyAppointmentsChange();
-      await reloadAppointments();
+      debouncedReload(300);
   
       return true;
     } catch (error: any) {
@@ -583,7 +667,7 @@ export const useAppointments = () => {
       toast.success('Lembrete marcado como enviado');
       // Opcional: recarregar lista para refletir alteração
       await notifyAppointmentsChange();
-      await reloadAppointments();
+      debouncedReload(300);
       return true;
     } catch (error: any) {
       console.error('Erro ao marcar lembrete como enviado:', error);
@@ -706,7 +790,7 @@ export const useAppointments = () => {
       toast.success('Agendamento atualizado com sucesso!');
       await notifyAppointmentsChange();
       // Recarregar agendamentos após atualização bem-sucedida
-      await reloadAppointments();
+      debouncedReload(300);
       
       return true;
     } catch (error: any) {

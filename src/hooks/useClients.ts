@@ -41,7 +41,7 @@ export const useClients = () => {
 
       let query = supabase
         .from('clients')
-        .select('*', { count: 'exact' })
+        .select('id, name, phone, email, created_at', { count: 'exact' })
         .range(from, to)
         .order('name');
 

@@ -10,6 +10,7 @@ interface RealtimeSubscriptionOptions {
   onDelete?: (payload: any) => void;
   onChange?: (payload: any) => void; // Callback genérico para qualquer mudança
   showNotifications?: boolean;
+  filter?: string;
 }
 
 export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) => {
@@ -21,7 +22,8 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
     onUpdate,
     onDelete,
     onChange,
-    showNotifications = true
+    showNotifications = true,
+    filter
   } = options;
 
   const handleRealtimeEvent = useCallback((payload: any) => {
@@ -73,7 +75,8 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
         {
           event: '*',
           schema: 'public',
-          table: table
+          table: table,
+          ...(filter ? { filter } : {})
         },
         handleRealtimeEvent
       )
@@ -87,7 +90,7 @@ export const useRealtimeSubscription = (options: RealtimeSubscriptionOptions) =>
       });
 
     channelRef.current = channel;
-  }, [table, handleRealtimeEvent]);
+  }, [table, handleRealtimeEvent, filter]);
 
   const unsubscribe = useCallback(() => {
     // Limpar timeout de reconexão se existir

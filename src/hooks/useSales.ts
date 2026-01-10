@@ -29,7 +29,8 @@ export const useSales = () => {
       // Recarregar dados quando houver qualquer mudança
       reloadSales();
     },
-    showNotifications: false
+    showNotifications: false,
+    filter: user?.role === 'barber' && user.barber?.id ? `barber_id=eq.${user.barber.id}` : undefined
   });
 
   const fetchSales = async (
@@ -59,6 +60,15 @@ export const useSales = () => {
       // Filtrar por barbeiro se usuário for barbeiro
       if (user?.role === 'barber' && user.barber?.id) {
         query = query.eq('barber_id', user.barber.id);
+      }
+
+      {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        query = query
+          .gte('sale_datetime', startOfMonth.toISOString())
+          .lte('sale_datetime', endOfMonth.toISOString());
       }
 
       if (search.trim()) {

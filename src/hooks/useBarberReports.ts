@@ -37,7 +37,7 @@ export const useBarberReports = () => {
       // Buscar informações do barbeiro
       const { data: barberData, error: barberError } = await supabase
         .from('barbers')
-        .select('*')
+        .select('id, name, commission_rate_service, commission_rate_product, commission_rate_chemical_service, is_special_barber')
         .eq('id', targetBarberId)
         .single();
 
@@ -95,7 +95,9 @@ export const useBarberReports = () => {
     const { data: appointments } = await supabase
       .from('appointments')
       .select(`
-        *,
+        appointment_datetime,
+        total_price,
+        final_amount,
         appointment_services(
           service_id,
           price_at_booking,
@@ -112,7 +114,8 @@ export const useBarberReports = () => {
     const { data: sales } = await supabase
       .from('sales')
       .select(`
-        *,
+        sale_datetime,
+        total_amount,
         sale_products(
           quantity,
           price_at_sale,

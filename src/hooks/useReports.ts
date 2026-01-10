@@ -20,7 +20,10 @@ export const useReports = () => {
       let salesQuery = supabase
         .from('sales')
         .select(`
-          *,
+          id,
+          sale_datetime,
+          total_amount,
+          barber_id,
           client:clients(id, name),
           barber:barbers(id, name, commission_rate_product),
           sale_products(
@@ -117,7 +120,13 @@ export const useReports = () => {
       let appointmentsQuery = supabase
         .from('appointments')
         .select(`
-          *,
+          id,
+          appointment_datetime,
+          barber_id,
+          client_id,
+          status,
+          total_price,
+          final_amount,
           client:clients(id, name),
           barber:barbers(id, name, commission_rate_service, commission_rate_chemical_service),
           appointment_services(
@@ -232,7 +241,7 @@ export const useReports = () => {
       // Buscar todos os clientes
       const { data: allClients, error: clientsError } = await supabase
         .from('clients')
-        .select('*');
+        .select('id, created_at');
 
       if (clientsError) throw clientsError;
 

@@ -224,7 +224,7 @@ async function testWeeklyFix() {
     // Deletar bloqueios filhos
     if (childBlocks && childBlocks.length > 0) {
       const childIds = childBlocks.map(b => b.id);
-      await supabase.from('schedule_blocks').delete().in('id', childIds);
+      await ('schedule_blocks').delete().in('id', childIds);
     }
     
     // Deletar bloqueio pai

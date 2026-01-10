@@ -20,7 +20,7 @@ export const useProducts = () => {
 
       let query = supabase
         .from('products')
-        .select('*', { count: 'exact' })
+        .select('id, name, description, price, stock_quantity, created_at, updated_at', { count: 'exact' })
         .range(from, to)
         .order('name');
 

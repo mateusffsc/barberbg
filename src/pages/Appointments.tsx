@@ -263,8 +263,10 @@ export const Appointments: React.FC = () => {
         return;
       }
 
-      await createAppointment(appointmentData, selectedServices, selectedBarber, recurrence);
-      await reloadAppointmentsWithFilters();
+      const created = await createAppointment(appointmentData, selectedServices, selectedBarber, recurrence);
+      if (created) {
+        setAppointments(prev => [created, ...prev.filter(a => a.id !== created.id)]);
+      }
       setIsModalOpen(false);
       toast.success('Agendamento criado com sucesso!');
     } catch (error: any) {
@@ -418,38 +420,44 @@ export const Appointments: React.FC = () => {
       }
 
       const appointmentDates = generateRecurrenceDates(fromLocalDateTimeString(appointmentData.appointment_datetime), recurrence);
+      const minDate = new Date(Math.min(...appointmentDates.map(d => d.getTime())));
+      const maxDate = new Date(Math.max(...appointmentDates.map(d => d.getTime())));
+      const rangeStart = new Date(minDate); rangeStart.setHours(0,0,0,0);
+      const rangeEnd = new Date(maxDate); rangeEnd.setHours(23,59,59,999);
+
+      const { data: dayAppointments, error: apErr } = await supabase
+        .from('appointments')
+        .select('id, appointment_datetime, duration_minutes, client_name, services_names')
+        .eq('barber_id', appointmentData.barber_id)
+        .eq('status', 'scheduled')
+        .gte('appointment_datetime', rangeStart.toISOString())
+        .lte('appointment_datetime', rangeEnd.toISOString());
+      if (apErr) throw apErr;
+
+      const { data: dayBlocks, error: blErr } = await supabase
+        .from('schedule_blocks')
+        .select('id, reason, start_time, end_time, barber_id, block_date')
+        .gte('block_date', toLocalDateString(rangeStart))
+        .lte('block_date', toLocalDateString(rangeEnd))
+        .or(`barber_id.eq.${appointmentData.barber_id},barber_id.is.null`);
+      if (blErr) throw blErr;
 
       const allConflicts: any[] = [];
-
       for (const date of appointmentDates) {
         const appointmentStart = date;
         const appointmentEnd = new Date(appointmentStart.getTime() + (durationMinutes * 60000));
+        const dateStr = toLocalDateString(appointmentStart);
 
-        // Buscar todos os agendamentos do mesmo barbeiro no mesmo dia
-        const dayStart = new Date(appointmentStart);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(appointmentStart);
-        dayEnd.setHours(23, 59, 59, 999);
-
-        const { data: allAppointments, error } = await supabase
-          .from('appointments')
-          .select('id, appointment_datetime, duration_minutes, client_name, services_names')
-          .eq('barber_id', appointmentData.barber_id)
-          .eq('status', 'scheduled')
-          .gte('appointment_datetime', dayStart.toISOString())
-          .lte('appointment_datetime', dayEnd.toISOString());
-
-        if (error) throw error;
-
-        // Filtrar agendamentos que realmente se sobrepõem
-        const conflictingAppointments = allAppointments?.filter(existing => {
+        const sameDayAppointments = (dayAppointments || []).filter(a => {
+          const d = new Date(a.appointment_datetime);
+          return d.toDateString() === appointmentStart.toDateString();
+        });
+        const conflictingAppointments = sameDayAppointments.filter(existing => {
           const existingStart = new Date(existing.appointment_datetime);
           const existingDuration = existing.duration_minutes || 30;
           const existingEnd = new Date(existingStart.getTime() + (existingDuration * 60000));
-
           return (appointmentStart < existingEnd && appointmentEnd > existingStart);
-        }) || [];
-
+        });
         if (conflictingAppointments.length > 0) {
           allConflicts.push(...conflictingAppointments.map(c => ({
             id: c.id,
@@ -459,24 +467,19 @@ export const Appointments: React.FC = () => {
           })));
         }
 
-        // Verificar bloqueios de agenda no período
-        const appointmentDateStr = toLocalDateString(appointmentStart);
-        const appointmentTimeStr = toLocalTimeString(appointmentStart);
-        const appointmentEndTimeStr = toLocalTimeString(appointmentEnd);
-
-        const { data: blocks } = await supabase
-          .from('schedule_blocks')
-          .select('id, reason, start_time, end_time, barber_id')
-          .eq('block_date', appointmentDateStr)
-          .or(`barber_id.eq.${appointmentData.barber_id},barber_id.is.null`)
-          .or(`and(start_time.lte.${appointmentTimeStr},end_time.gt.${appointmentTimeStr}),and(start_time.lt.${appointmentEndTimeStr},end_time.gte.${appointmentEndTimeStr}),and(start_time.gte.${appointmentTimeStr},end_time.lte.${appointmentEndTimeStr})`);
-
-        if (blocks && blocks.length > 0) {
-          // Tratar bloqueios como conflitos também
-          allConflicts.push(...blocks.map(b => ({
+        const blocksForDay = (dayBlocks || []).filter(b => b.block_date === dateStr);
+        const conflictsFromBlocks = blocksForDay.filter(b => {
+          const blockStartStr = b.start_time;
+          const blockEndStr = b.end_time;
+          const blockStart = new Date(`${dateStr}T${blockStartStr}`);
+          const blockEnd = new Date(`${dateStr}T${blockEndStr}`);
+          return (appointmentStart < blockEnd && appointmentEnd > blockStart);
+        });
+        if (conflictsFromBlocks.length > 0) {
+          allConflicts.push(...conflictsFromBlocks.map(b => ({
             id: b.id,
             client_name: `[Bloqueio] ${b.reason || 'Período bloqueado'}`,
-            appointment_datetime: `${appointmentDateStr}T${b.start_time}`,
+            appointment_datetime: `${dateStr}T${b.start_time}`,
             duration_minutes: 0
           })));
         }
@@ -533,14 +536,16 @@ export const Appointments: React.FC = () => {
 
     setModalLoading(true);
     try {
-      await createAppointment(
+      const created = await createAppointment(
         pendingAppointmentData, 
         pendingSelectedServices, 
         pendingSelectedBarber, 
         pendingRecurrence,
         true // allowOverlap = true para permitir sobreposição
       );
-      await reloadAppointmentsWithFilters();
+      if (created) {
+        setAppointments(prev => [created, ...prev.filter(a => a.id !== created.id)]);
+      }
       setConflictModalOpen(false);
       setPendingAppointmentData(null);
       setPendingSelectedServices([]);
