@@ -196,18 +196,29 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   const handleRecurrenceAction = async (action: 'single' | 'all') => {
     if (!event?.resource.appointment) return;
 
+    console.log('🔄 Iniciando ação de recorrência:', { action, recurrenceAction, appointmentId: event.resource.appointment.id, recurrenceGroupId: event.resource.appointment.recurrence_group_id });
+
     try {
       if (recurrenceAction === 'delete') {
         if (action === 'single') {
           // Excluir apenas este agendamento
+          console.log('🗑️ Excluindo agendamento único:', event.resource.appointment.id);
           if (onDeleteAppointment) {
             await onDeleteAppointment(event.resource.appointment.id);
             toast.success('Agendamento excluído com sucesso!');
           }
         } else {
           // Excluir toda a série recorrente
+          console.log('🗑️ Excluindo série recorrente:', event.resource.appointment.recurrence_group_id);
           if (onDeleteRecurringAppointments && event.resource.appointment.recurrence_group_id) {
-            await onDeleteRecurringAppointments(event.resource.appointment.recurrence_group_id);
+            console.log('📞 Chamando função deleteRecurringAppointments...');
+            const result = await onDeleteRecurringAppointments(event.resource.appointment.recurrence_group_id);
+            console.log('✅ Resultado da exclusão:', result);
+          } else {
+            console.log('❌ Função ou recurrence_group_id não disponível:', { 
+              hasFunction: !!onDeleteRecurringAppointments, 
+              recurrenceGroupId: event.resource.appointment.recurrence_group_id 
+            });
           }
         }
       } else if (recurrenceAction === 'edit') {
@@ -242,7 +253,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
       setShowRecurrenceModal(false);
       onClose();
     } catch (error) {
-      console.error('Erro na ação de recorrência:', error);
+      console.error('❌ Erro na ação de recorrência:', error);
       toast.error('Erro ao processar ação');
     }
   };

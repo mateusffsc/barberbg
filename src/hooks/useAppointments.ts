@@ -19,6 +19,16 @@ export const useAppointments = () => {
   const lastFiltersRef = useRef<{ startDate?: Date; endDate?: Date; barberId?: number }>({});
   const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
   const reloadTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 🚀 CACHE INTELIGENTE para otimização de performance
+  const cacheRef = useRef<Map<string, { data: AppointmentsResponse; timestamp: number }>>(new Map());
+  const CACHE_DURATION = 2 * 60 * 1000; // 2 minutos de TTL
+  
+  // Função para limpar cache quando dados são modificados
+  const clearCache = useCallback(() => {
+    console.log('🗑️ Limpando cache de agendamentos');
+    cacheRef.current.clear();
+  }, []);
 
   // Função para recarregar appointments
   const reloadAppointments = useCallback(async (startDate?: Date, endDate?: Date, barberId?: number) => {
@@ -45,8 +55,8 @@ export const useAppointments = () => {
     }
   }, []);
 
-  // Debounce para evitar corrida entre INSERT do appointment e INSERT de appointment_services
-  const debouncedReload = useCallback((delayMs: number = 400) => {
+  // Debounce OTIMIZADO para evitar corrida entre INSERT do appointment e INSERT de appointment_services
+  const debouncedReload = useCallback((delayMs: number = 800) => { // 🚀 AUMENTADO de 400ms para 800ms
     if (reloadTimerRef.current) {
       clearTimeout(reloadTimerRef.current);
     }
@@ -58,9 +68,9 @@ export const useAppointments = () => {
   const getEffectiveFilters = useCallback(() => {
     const now = new Date();
     const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    defaultStart.setDate(defaultStart.getDate() - 7);
+    defaultStart.setDate(defaultStart.getDate() - 15); // OTIMIZADO: apenas 15 dias no passado
     const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    defaultEnd.setDate(defaultEnd.getDate() + 60);
+    defaultEnd.setDate(defaultEnd.getDate() + 75); // OTIMIZADO: 75 dias no futuro (total: 90 dias)
     const startDate = lastFiltersRef.current.startDate ?? defaultStart;
     const endDate = lastFiltersRef.current.endDate ?? new Date(defaultEnd.getFullYear(), defaultEnd.getMonth(), defaultEnd.getDate(), 23, 59, 59, 999);
     const barberId = lastFiltersRef.current.barberId ?? (user?.role === 'barber' ? user.barber?.id : undefined);
@@ -77,33 +87,51 @@ export const useAppointments = () => {
   }, [getEffectiveFilters]);
 
   const fetchAppointmentById = useCallback(async (id: number) => {
+    // 🚀 QUERY OTIMIZADA - usar dados já disponíveis nos campos
     const { data } = await supabase
       .from('appointments')
       .select(`
-        *,
-        client:clients(id, name),
-        barber:barbers(id, name, is_special_barber),
-        appointment_services(
-          service_id,
-          price_at_booking,
-          commission_rate_applied,
-          service:services(id, name, duration_minutes_normal, duration_minutes_special, is_chemical)
-        )
+        id, client_id, barber_id, client_name, client_phone, barber_name, barber_phone,
+        appointment_datetime, appointment_date, appointment_time, status, total_price, 
+        duration_minutes, services_names, services_ids, note, recurrence_group_id,
+        created_at, updated_at, payment_method, reminder_sent
       `)
       .eq('id', id)
       .single();
+      
     if (!data) return null;
+    
+    // Criar serviços a partir dos dados já disponíveis
+    const services = [];
+    if (data.services_names && data.services_ids) {
+      const serviceNames = data.services_names.split(', ');
+      const serviceIds = data.services_ids || [];
+      
+      serviceNames.forEach((name, index) => {
+        services.push({
+          id: serviceIds[index] || index + 1,
+          name: name.trim(),
+          price_at_booking: data.total_price / serviceNames.length,
+          duration_minutes_normal: data.duration_minutes || 30,
+          duration_minutes_special: data.duration_minutes || 30,
+          is_chemical: false,
+          commission_rate_applied: 0.1
+        });
+      });
+    }
+    
     return {
       ...data,
-      services: data.appointment_services?.map((as: any) => ({
-        id: as.service.id,
-        name: as.service.name,
-        duration_minutes_normal: as.service.duration_minutes_normal,
-        duration_minutes_special: as.service.duration_minutes_special,
-        is_chemical: as.service.is_chemical,
-        price_at_booking: as.price_at_booking,
-        commission_rate_applied: as.commission_rate_applied
-      })) || []
+      client: data.client_name ? {
+        id: data.client_id,
+        name: data.client_name
+      } : null,
+      barber: data.barber_name ? {
+        id: data.barber_id,
+        name: data.barber_name,
+        is_special_barber: false
+      } : null,
+      services
     };
   }, []);
 
@@ -218,6 +246,9 @@ export const useAppointments = () => {
   // Helper para enviar broadcast após qualquer alteração
   const notifyAppointmentsChange = async () => {
     try {
+      // 🚀 LIMPAR CACHE quando dados são modificados
+      clearCache();
+      
       if (!broadcastChannelRef.current) {
         broadcastChannelRef.current = supabase.channel('appointments-sync').subscribe();
       }
@@ -242,25 +273,31 @@ export const useAppointments = () => {
       lastFiltersRef.current = { startDate, endDate, barberId };
       const now = new Date();
       const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      defaultStart.setDate(defaultStart.getDate() - 7);
+      defaultStart.setDate(defaultStart.getDate() - 15); // OTIMIZADO: apenas 15 dias no passado
       const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      defaultEnd.setDate(defaultEnd.getDate() + 60);
+      defaultEnd.setDate(defaultEnd.getDate() + 75); // OTIMIZADO: 75 dias no futuro
       const effectiveStart = startDate ?? defaultStart;
       const effectiveEnd = endDate ?? new Date(defaultEnd.getFullYear(), defaultEnd.getMonth(), defaultEnd.getDate(), 23, 59, 59, 999);
-      // Função para buscar uma página de agendamentos
+      
+      // 🚀 VERIFICAR CACHE PRIMEIRO
+      const cacheKey = `${effectiveStart.toISOString()}-${effectiveEnd.toISOString()}-${barberId || 'all'}`;
+      const cached = cacheRef.current.get(cacheKey);
+      
+      if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+        console.log('📦 Cache HIT - Usando dados do cache:', cacheKey);
+        return cached.data;
+      }
+      
+      console.log('🔍 Cache MISS - Buscando dados do servidor:', cacheKey);
+      // Função para buscar uma página de agendamentos (OTIMIZADA - sem JOINs)
       const fetchPage = async (from: number, to: number) => {
         let query = supabase
           .from('appointments')
           .select(`
-            *,
-            client:clients(id, name),
-            barber:barbers(id, name, is_special_barber),
-            appointment_services(
-              service_id,
-              price_at_booking,
-              commission_rate_applied,
-              service:services(id, name, duration_minutes_normal, duration_minutes_special, is_chemical)
-            )
+            id, client_id, barber_id, client_name, client_phone, barber_name, barber_phone,
+            appointment_datetime, appointment_date, appointment_time, status, total_price, 
+            duration_minutes, services_names, services_ids, note, recurrence_group_id,
+            created_at, updated_at, payment_method, reminder_sent
           `, { count: 'exact' })
           .order('appointment_datetime')
           .range(from, to);
@@ -307,24 +344,55 @@ export const useAppointments = () => {
         }
       }
 
-      // Transformar dados para incluir serviços
-      const appointmentsWithServices = (allData || []).map(appointment => ({
-        ...appointment,
-        services: appointment.appointment_services?.map((as: any) => ({
-          id: as.service.id,
-          name: as.service.name,
-          duration_minutes_normal: as.service.duration_minutes_normal,
-          duration_minutes_special: as.service.duration_minutes_special,
-          is_chemical: as.service.is_chemical,
-          price_at_booking: as.price_at_booking,
-          commission_rate_applied: as.commission_rate_applied
-        })) || []
-      }));
+      // Transformar dados usando informações já disponíveis nos campos (SEM JOINs)
+      const appointmentsWithServices = (allData || []).map(appointment => {
+        // Criar serviços a partir dos dados já disponíveis
+        const services = [];
+        if (appointment.services_names && appointment.services_ids) {
+          const serviceNames = appointment.services_names.split(', ');
+          const serviceIds = appointment.services_ids || [];
+          
+          serviceNames.forEach((name, index) => {
+            services.push({
+              id: serviceIds[index] || index + 1,
+              name: name.trim(),
+              price_at_booking: appointment.total_price / serviceNames.length, // Divisão aproximada
+              duration_minutes_normal: appointment.duration_minutes || 30,
+              duration_minutes_special: appointment.duration_minutes || 30,
+              is_chemical: false, // Valor padrão
+              commission_rate_applied: 0.1 // Valor padrão
+            });
+          });
+        }
+        
+        return {
+          ...appointment,
+          client: appointment.client_name ? {
+            id: appointment.client_id,
+            name: appointment.client_name
+          } : null,
+          barber: appointment.barber_name ? {
+            id: appointment.barber_id,
+            name: appointment.barber_name,
+            is_special_barber: false // Valor padrão, pode ser ajustado se necessário
+          } : null,
+          services
+        };
+      });
 
-      return {
+      const result = {
         appointments: appointmentsWithServices,
         count: count || 0
       };
+      
+      // 🚀 ARMAZENAR NO CACHE
+      cacheRef.current.set(cacheKey, {
+        data: result,
+        timestamp: Date.now()
+      });
+      
+      console.log('💾 Dados armazenados no cache:', cacheKey, `(${appointmentsWithServices.length} registros)`);
+      return result;
     } catch (error) {
       console.error('Erro ao buscar agendamentos:', error);
       toast.error('Erro ao carregar agendamentos');
@@ -986,44 +1054,73 @@ export const useAppointments = () => {
   };
 
   const deleteRecurringAppointments = async (recurrenceGroupId: string) => {
+    console.log('🗑️ Iniciando exclusão de agendamentos recorrentes:', recurrenceGroupId);
     try {
       // Buscar todos os agendamentos da série recorrente
+      console.log('🔍 Buscando agendamentos do grupo recorrente...');
       const { data: appointments, error: fetchError } = await supabase
         .from('appointments')
         .select('id')
         .eq('recurrence_group_id', recurrenceGroupId);
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('❌ Erro ao buscar agendamentos:', fetchError);
+        throw fetchError;
+      }
+
+      console.log(`📊 Agendamentos encontrados: ${appointments?.length || 0}`);
 
       if (!appointments || appointments.length === 0) {
+        console.log('⚠️ Nenhum agendamento encontrado na série recorrente');
         toast.error('Nenhum agendamento encontrado na série recorrente');
         return false;
       }
 
       const appointmentIds = appointments.map(app => app.id);
+      console.log(`🎯 IDs dos agendamentos a serem excluídos: ${appointmentIds.join(', ')}`);
 
       // Primeiro deletar todos os serviços dos agendamentos
+      console.log('🗑️ Deletando serviços dos agendamentos...');
       const { error: servicesError } = await supabase
         .from('appointment_services')
         .delete()
         .in('appointment_id', appointmentIds);
 
-      if (servicesError) throw servicesError;
+      if (servicesError) {
+        console.error('❌ Erro ao deletar serviços:', servicesError);
+        throw servicesError;
+      }
+
+      console.log('✅ Serviços deletados com sucesso');
 
       // Depois deletar todos os agendamentos
+      console.log('🗑️ Deletando agendamentos...');
       const { error } = await supabase
         .from('appointments')
         .delete()
         .eq('recurrence_group_id', recurrenceGroupId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao deletar agendamentos:', error);
+        throw error;
+      }
+
+      console.log('✅ Agendamentos deletados com sucesso');
+
+      // Verificar se realmente foram deletados
+      const { data: remainingAppointments } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('recurrence_group_id', recurrenceGroupId);
+
+      console.log(`📊 Agendamentos restantes após exclusão: ${remainingAppointments?.length || 0}`);
 
       toast.success(`${appointments.length} agendamentos da série recorrente excluídos com sucesso!`);
       await notifyAppointmentsChange();
       return true;
     } catch (error: any) {
-      console.error('Erro ao excluir agendamentos recorrentes:', error);
-      toast.error('Erro ao excluir agendamentos recorrentes');
+      console.error('❌ Erro ao excluir agendamentos recorrentes:', error);
+      toast.error(`Erro ao excluir agendamentos recorrentes: ${error.message || 'Erro desconhecido'}`);
       return false;
     }
   };

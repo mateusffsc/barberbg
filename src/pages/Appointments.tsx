@@ -1014,8 +1014,6 @@ export const Appointments: React.FC = () => {
                 <Lock className="h-4 w-4 mr-2" />
                 Bloquear
               </button>
-
-
             </div>
           </div>
 
