@@ -92,7 +92,7 @@ export const useAppointments = () => {
       .from('appointments')
       .select(`
         id, client_id, barber_id, client_name, client_phone, barber_name, barber_phone,
-        appointment_datetime, appointment_date, appointment_time, status, total_price, 
+        appointment_datetime, appointment_date, appointment_time, status, total_price, final_amount,
         duration_minutes, services_names, services_ids, note, recurrence_group_id,
         created_at, updated_at, payment_method, reminder_sent
       `)
@@ -295,7 +295,7 @@ export const useAppointments = () => {
           .from('appointments')
           .select(`
             id, client_id, barber_id, client_name, client_phone, barber_name, barber_phone,
-            appointment_datetime, appointment_date, appointment_time, status, total_price, 
+            appointment_datetime, appointment_date, appointment_time, status, total_price, final_amount,
             duration_minutes, services_names, services_ids, note, recurrence_group_id,
             created_at, updated_at, payment_method, reminder_sent
           `, { count: 'exact' })

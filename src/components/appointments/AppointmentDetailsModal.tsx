@@ -814,7 +814,11 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                       <div className="flex items-center space-x-2">
                         <DollarSign className="h-5 w-5 text-green-600" />
                         <span className="text-lg font-bold text-green-600">
-                          {formatCurrency(event.resource.total)}
+                          {formatCurrency(
+                            event.resource.appointment.status === 'completed' && event.resource.appointment.final_amount 
+                              ? event.resource.appointment.final_amount 
+                              : event.resource.total
+                          )}
                         </span>
                       </div>
                     </div>
