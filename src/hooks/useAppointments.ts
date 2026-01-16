@@ -182,17 +182,31 @@ export const useAppointments = () => {
     setTotalCount(prev => Math.max(0, prev - 1));
   }, []);
 
-  // Configurar subscription em tempo real para appointments
+  // Configurar subscription em tempo real para appointments (SEM FILTRO para melhor sincronização)
   useRealtimeSubscription({
     table: 'appointments',
-    onInsert: handleInsertAppointment,
-    onUpdate: handleUpdateAppointment,
-    onDelete: handleDeleteAppointment,
+    onInsert: (payload) => {
+      console.log('📥 INSERT detectado:', payload.new?.id);
+      clearCache(); // Limpar cache imediatamente
+      handleInsertAppointment(payload);
+    },
+    onUpdate: (payload) => {
+      console.log('✏️ UPDATE detectado:', payload.new?.id);
+      clearCache(); // Limpar cache imediatamente
+      handleUpdateAppointment(payload);
+    },
+    onDelete: (payload) => {
+      console.log('🗑️ DELETE detectado:', payload.old?.id);
+      clearCache(); // Limpar cache imediatamente
+      handleDeleteAppointment(payload);
+    },
     onChange: (payload) => {
-      debouncedReload(400);
+      console.log('🔄 Evento genérico detectado:', payload);
+      clearCache(); // Limpar cache imediatamente
+      debouncedReload(100); // Reduzido de 400ms para 100ms
     },
     showNotifications: false, // Desabilitar notificações automáticas para evitar spam
-    filter: user?.role === 'barber' && user.barber?.id ? `barber_id=eq.${user.barber.id}` : undefined
+    filter: undefined // 🚀 REMOVIDO FILTRO para receber TODOS os eventos
   });
 
   // Assinar mudanças em bloqueios de agenda para refletir imediatamente na visão do calendário
@@ -200,19 +214,23 @@ export const useAppointments = () => {
     table: 'schedule_blocks',
     onInsert: (payload) => {
       console.log('📥 useAppointments: INSERT em schedule_blocks:', payload);
-      debouncedReload(400);
+      clearCache(); // Limpar cache imediatamente
+      debouncedReload(100); // Reduzido de 400ms para 100ms
     },
     onUpdate: (payload) => {
       console.log('✏️ useAppointments: UPDATE em schedule_blocks:', payload);
-      debouncedReload(300);
+      clearCache(); // Limpar cache imediatamente
+      debouncedReload(100); // Reduzido de 300ms para 100ms
     },
     onDelete: (payload) => {
       console.log('🗑️ useAppointments: DELETE em schedule_blocks:', payload);
-      debouncedReload(300);
+      clearCache(); // Limpar cache imediatamente
+      debouncedReload(100); // Reduzido de 300ms para 100ms
     },
     onChange: (payload) => {
       console.log('🔄 useAppointments: Evento genérico em schedule_blocks:', payload);
-      debouncedReload(350);
+      clearCache(); // Limpar cache imediatamente
+      debouncedReload(100); // Reduzido de 350ms para 100ms
     },
     showNotifications: false
   });
@@ -223,15 +241,39 @@ export const useAppointments = () => {
       .channel('appointments-sync')
       .on('broadcast', { event: 'appointments_change' }, (payload) => {
         console.log('📡 Broadcast recebido: appointments_change', payload);
-        debouncedReload(450);
+        clearCache(); // Limpar cache imediatamente
+        debouncedReload(100); // Reduzido de 450ms para 100ms
+      })
+      .on('broadcast', { event: 'heartbeat' }, (payload) => {
+        console.log('💓 Heartbeat recebido:', payload.payload?.timestamp);
       })
       .subscribe((status) => {
         console.log('🔌 Broadcast channel status:', status);
+        
+        // Reconectar automaticamente em caso de erro
+        if (status === 'CHANNEL_ERROR') {
+          console.log('🔄 Tentando reconectar broadcast channel...');
+          setTimeout(() => {
+            channel.subscribe();
+          }, 3000);
+        }
       });
 
     broadcastChannelRef.current = channel;
 
+    // 🚀 HEARTBEAT para manter conexão ativa
+    const heartbeat = setInterval(() => {
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.send({
+          type: 'broadcast',
+          event: 'heartbeat',
+          payload: { timestamp: Date.now(), source: 'desktop' }
+        });
+      }
+    }, 30000); // A cada 30 segundos
+
     return () => {
+      clearInterval(heartbeat);
       if (broadcastChannelRef.current) {
         broadcastChannelRef.current.unsubscribe();
         broadcastChannelRef.current = null;
@@ -241,10 +283,10 @@ export const useAppointments = () => {
         reloadTimerRef.current = null;
       }
     };
-  }, [debouncedReload]);
+  }, [debouncedReload, clearCache]);
 
-  // Helper para enviar broadcast após qualquer alteração
-  const notifyAppointmentsChange = async () => {
+  // Helper para enviar broadcast após qualquer alteração (COM RETRY)
+  const notifyAppointmentsChange = async (action = 'change', appointmentId = null) => {
     try {
       // 🚀 LIMPAR CACHE quando dados são modificados
       clearCache();
@@ -252,14 +294,32 @@ export const useAppointments = () => {
       if (!broadcastChannelRef.current) {
         broadcastChannelRef.current = supabase.channel('appointments-sync').subscribe();
       }
-      await broadcastChannelRef.current?.send({
-        type: 'broadcast',
-        event: 'appointments_change',
-        payload: { ts: Date.now() }
-      });
-      console.log('📣 Broadcast enviado: appointments_change');
+      
+      // 🚀 BROADCAST COM RETRY para maior confiabilidade
+      const payload = {
+        action,
+        appointmentId,
+        timestamp: Date.now(),
+        source: 'desktop'
+      };
+      
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await broadcastChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'appointments_change',
+            payload
+          });
+          console.log(`📣 Broadcast enviado (tentativa ${attempt + 1}):`, payload);
+          break; // Sucesso, sair do loop
+        } catch (error) {
+          console.error(`❌ Erro no broadcast (tentativa ${attempt + 1}):`, error);
+          if (attempt === 2) throw error; // Última tentativa
+          await new Promise(resolve => setTimeout(resolve, 500)); // Aguardar antes de retry
+        }
+      }
     } catch (error) {
-      console.error('❌ Erro ao enviar broadcast:', error);
+      console.error('❌ Erro final no broadcast:', error);
     }
   };
 
@@ -603,7 +663,7 @@ export const useAppointments = () => {
       
       toast.success(message);
       // Notificar outras sessões (admin/barbeiro)
-      await notifyAppointmentsChange();
+      await notifyAppointmentsChange('created', firstAppointment.id);
       return firstAppointment;
     } catch (error: any) {
       console.error('Erro ao criar agendamento:', error);
@@ -1452,6 +1512,18 @@ export const useAppointments = () => {
       return false;
     }
   };
+
+  // 🚀 FALLBACK com polling para garantir sincronização
+  useEffect(() => {
+    // Polling como backup a cada 15 segundos
+    const pollInterval = setInterval(() => {
+      console.log('🔄 Polling de backup executado');
+      clearCache(); // Limpar cache antes do polling
+      reloadAppointments();
+    }, 15000); // A cada 15 segundos
+
+    return () => clearInterval(pollInterval);
+  }, [reloadAppointments, clearCache]);
 
   return {
     appointments,
