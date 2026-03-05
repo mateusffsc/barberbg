@@ -161,10 +161,11 @@ export const Dashboard: React.FC = () => {
       
       if (clientsError) throw clientsError;
       
-      // Buscar barbeiros
+      // Buscar barbeiros (excluindo Luiz Henrique)
       const { data: barbersData, error: barbersError } = await supabase
         .from('barbers')
         .select('*')
+        .not('name', 'ilike', '%luiz henrique%')
         .order('name');
       
       if (barbersError) throw barbersError;

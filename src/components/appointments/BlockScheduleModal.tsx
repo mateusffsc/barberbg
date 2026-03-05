@@ -43,8 +43,11 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
 
-  // Exibir lista de barbeiros sem o barbeiro "rose"
-  const displayBarbers = barbers.filter(b => (b.name || '').toLowerCase() !== 'rose');
+  // Exibir lista de barbeiros sem barbeiros específicos
+  const displayBarbers = barbers.filter(b => {
+    const name = (b.name || '').toLowerCase();
+    return name !== 'rose' && !name.includes('luiz henrique');
+  });
 
   // Carregar barbeiros quando o modal abrir
   useEffect(() => {

@@ -36,7 +36,10 @@ export const DayViewDesktop: React.FC<DayViewDesktopProps> = ({
     user?.role === 'barber'
       ? barbers.filter(barber => barber.id === user.barber?.id?.toString())
       : barbers
-  ).filter(b => (b.name || '').toLowerCase() !== 'rose');
+  ).filter(b => {
+    const name = (b.name || '').toLowerCase();
+    return name !== 'rose' && !name.includes('luiz henrique');
+  });
 
   // Agrupar eventos por barbeiro
   const eventsByBarber = filteredBarbers.reduce((acc, barber) => {

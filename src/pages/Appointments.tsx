@@ -48,8 +48,11 @@ export const Appointments: React.FC = () => {
     fetchBarbers
   } = useBarbers();
 
-  // Exibir todos os barbeiros cadastrados, exceto o barbeiro "rose"
-  const filteredBarbers = barbers.filter(b => (b.name || '').toLowerCase() !== 'rose');
+  // Exibir todos os barbeiros cadastrados, exceto barbeiros específicos
+  const filteredBarbers = barbers.filter(b => {
+    const name = (b.name || '').toLowerCase();
+    return name !== 'rose' && !name.includes('luiz henrique');
+  });
 
   const {
     services,

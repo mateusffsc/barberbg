@@ -55,6 +55,9 @@ export const useBarbers = () => {
         .range(from, to)
         .order('name');
 
+      // Filtrar Luiz Henrique (ocultar do frontend)
+      query = query.not('name', 'ilike', '%luiz henrique%');
+
       if (search.trim()) {
         query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
       }
