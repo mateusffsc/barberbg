@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Client, ClientFormData, ClientsResponse } from '../types/client';
 import toast from 'react-hot-toast';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
+import { useAuth } from '../contexts/AuthContext';
+import { logAudit } from '../utils/auditLogger';
 
 export const useClients = () => {
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -79,6 +82,15 @@ export const useClients = () => {
       if (error) throw error;
 
       toast.success('Cliente cadastrado com sucesso!');
+      
+      await logAudit(
+        user?.id,
+        'CREATE',
+        'client',
+        data.id,
+        `Criou cliente: ${clientData.name}`
+      );
+
       return data;
     } catch (error: any) {
       console.error('Erro ao criar cliente:', error);
@@ -109,7 +121,16 @@ export const useClients = () => {
       if (error) throw error;
 
       toast.success('Cliente atualizado com sucesso!');
-      return data;
+      
+      await logAudit(
+        user?.id,
+        'UPDATE',
+        'client',
+        id,
+        `Atualizou cliente: ${clientData.name}`
+      );
+
+      return true;
     } catch (error: any) {
       console.error('Erro ao atualizar cliente:', error);
       

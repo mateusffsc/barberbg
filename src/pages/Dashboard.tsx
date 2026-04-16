@@ -619,6 +619,20 @@ export const Dashboard: React.FC = () => {
       // Atualizar lista local de clientes
       setClients(prev => [...prev, newClient]);
       toast.success('Cliente cadastrado com sucesso!');
+      
+      try {
+        const { logAudit } = await import('../utils/auditLogger');
+        await logAudit(
+          user?.id,
+          'CREATE',
+          'client',
+          newClient.id,
+          `Criou cliente: ${clientData.name} pelo Dashboard`
+        );
+      } catch (e) {
+        console.error('Erro ao registrar log de auditoria', e);
+      }
+
       return newClient;
     } catch (error: any) {
       console.error('Erro ao criar cliente:', error);

@@ -10,6 +10,13 @@ import { fromLocalDateTimeString, toLocalISOString, toLocalDateString, toLocalTi
 import toast from 'react-hot-toast';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
 import { safeRandomUUID } from '../utils/uuid';
+import { logAudit } from '../utils/auditLogger';
+
+const devLog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
 
 export const useAppointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -19,20 +26,98 @@ export const useAppointments = () => {
   const lastFiltersRef = useRef<{ startDate?: Date; endDate?: Date; barberId?: number }>({});
   const broadcastChannelRef = useRef<RealtimeChannel | null>(null);
   const reloadTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeActiveRef = useRef<boolean>(false);
   
   // 🚀 CACHE INTELIGENTE para otimização de performance
-  const cacheRef = useRef<Map<string, { data: AppointmentsResponse; timestamp: number }>>(new Map());
+  const cacheRef = useRef<Map<string, { data: AppointmentsResponse; timestamp: number; version: string | null; meta: { startIso: string; endIso: string; barberId: number | null } }>>(new Map());
   const CACHE_DURATION = 2 * 60 * 1000; // 2 minutos de TTL
   
   // Função para limpar cache quando dados são modificados
   const clearCache = useCallback(() => {
-    console.log('🗑️ Limpando cache de agendamentos');
+    devLog('🗑️ Limpando cache de agendamentos');
     cacheRef.current.clear();
+  }, []);
+
+  const getCacheKey = useCallback((startDate: Date, endDate: Date, barberId?: number) => {
+    return `${startDate.toISOString()}-${endDate.toISOString()}-${barberId || 'all'}`;
+  }, []);
+
+  const touchCache = useCallback((cacheKey: string) => {
+    const cached = cacheRef.current.get(cacheKey);
+    if (!cached) return false;
+    cacheRef.current.set(cacheKey, { ...cached, timestamp: Date.now() });
+    return true;
+  }, []);
+
+  const invalidateCacheKey = useCallback((cacheKey: string) => {
+    cacheRef.current.delete(cacheKey);
+  }, []);
+
+  const upsertAppointmentInCache = useCallback((appointment: Appointment) => {
+    const sortAsc = (list: Appointment[]) => {
+      return [...list].sort((a, b) => new Date(a.appointment_datetime).getTime() - new Date(b.appointment_datetime).getTime());
+    };
+
+    const appointmentDate = new Date(appointment.appointment_datetime);
+
+    cacheRef.current.forEach((entry, key) => {
+      const startDate = new Date(entry.meta.startIso);
+      const endDate = new Date(entry.meta.endIso);
+      const inRange = appointmentDate >= startDate && appointmentDate <= endDate;
+      const barberOk = entry.meta.barberId ? appointment.barber_id === entry.meta.barberId : true;
+      const shouldInclude = inRange && barberOk;
+
+      const existing = entry.data.appointments;
+      const idx = existing.findIndex(a => a.id === appointment.id);
+
+      if (!shouldInclude) {
+        if (idx < 0) return;
+        const nextAppointments = existing.filter(a => a.id !== appointment.id);
+        const nextCount = Math.max(0, entry.data.count - 1);
+        cacheRef.current.set(key, {
+          ...entry,
+          data: { appointments: nextAppointments, count: nextCount },
+          timestamp: Date.now()
+        });
+        return;
+      }
+
+      const nextAppointments = idx >= 0
+        ? sortAsc(existing.map(a => (a.id === appointment.id ? appointment : a)))
+        : sortAsc([...existing, appointment]);
+
+      const nextCount = idx >= 0 ? entry.data.count : entry.data.count + 1;
+      const nextVersion = appointment.updated_at
+        ? (entry.version && entry.version > appointment.updated_at ? entry.version : appointment.updated_at)
+        : entry.version;
+
+      cacheRef.current.set(key, {
+        ...entry,
+        data: { appointments: nextAppointments, count: nextCount },
+        timestamp: Date.now(),
+        version: nextVersion
+      });
+    });
+  }, []);
+
+  const removeAppointmentFromCache = useCallback((appointmentId: number) => {
+    cacheRef.current.forEach((entry, key) => {
+      const existing = entry.data.appointments;
+      const idx = existing.findIndex(a => a.id === appointmentId);
+      if (idx < 0) return;
+      const nextAppointments = existing.filter(a => a.id !== appointmentId);
+      const nextCount = Math.max(0, entry.data.count - 1);
+      cacheRef.current.set(key, {
+        ...entry,
+        data: { appointments: nextAppointments, count: nextCount },
+        timestamp: Date.now()
+      });
+    });
   }, []);
 
   // Função para recarregar appointments
   const reloadAppointments = useCallback(async (startDate?: Date, endDate?: Date, barberId?: number) => {
-    console.log('🔄 useAppointments: Iniciando recarregamento de agendamentos...');
+    devLog('🔄 useAppointments: Iniciando recarregamento de agendamentos...');
     try {
       const effectiveStart = startDate ?? lastFiltersRef.current.startDate;
       const effectiveEnd = endDate ?? lastFiltersRef.current.endDate;
@@ -49,7 +134,7 @@ export const useAppointments = () => {
         barberId: effectiveBarberId
       };
 
-      console.log('✅ useAppointments: Agendamentos recarregados com sucesso:', response.appointments.length, 'agendamentos');
+      devLog('✅ useAppointments: Agendamentos recarregados com sucesso:', response.appointments.length, 'agendamentos');
     } catch (error) {
       console.error('❌ useAppointments: Erro ao recarregar agendamentos:', error);
     }
@@ -186,22 +271,22 @@ export const useAppointments = () => {
   useRealtimeSubscription({
     table: 'appointments',
     onInsert: (payload) => {
-      console.log('📥 INSERT detectado:', payload.new?.id);
+      devLog('📥 INSERT detectado:', payload.new?.id);
       clearCache(); // Limpar cache imediatamente
       handleInsertAppointment(payload);
     },
     onUpdate: (payload) => {
-      console.log('✏️ UPDATE detectado:', payload.new?.id);
+      devLog('✏️ UPDATE detectado:', payload.new?.id);
       clearCache(); // Limpar cache imediatamente
       handleUpdateAppointment(payload);
     },
     onDelete: (payload) => {
-      console.log('🗑️ DELETE detectado:', payload.old?.id);
+      devLog('🗑️ DELETE detectado:', payload.old?.id);
       clearCache(); // Limpar cache imediatamente
       handleDeleteAppointment(payload);
     },
     onChange: (payload) => {
-      console.log('🔄 Evento genérico detectado:', payload);
+      devLog('🔄 Evento genérico detectado:', payload);
       clearCache(); // Limpar cache imediatamente
       debouncedReload(100); // Reduzido de 400ms para 100ms
     },
@@ -213,22 +298,22 @@ export const useAppointments = () => {
   useRealtimeSubscription({
     table: 'schedule_blocks',
     onInsert: (payload) => {
-      console.log('📥 useAppointments: INSERT em schedule_blocks:', payload);
+      devLog('📥 useAppointments: INSERT em schedule_blocks:', payload);
       clearCache(); // Limpar cache imediatamente
       debouncedReload(100); // Reduzido de 400ms para 100ms
     },
     onUpdate: (payload) => {
-      console.log('✏️ useAppointments: UPDATE em schedule_blocks:', payload);
+      devLog('✏️ useAppointments: UPDATE em schedule_blocks:', payload);
       clearCache(); // Limpar cache imediatamente
       debouncedReload(100); // Reduzido de 300ms para 100ms
     },
     onDelete: (payload) => {
-      console.log('🗑️ useAppointments: DELETE em schedule_blocks:', payload);
+      devLog('🗑️ useAppointments: DELETE em schedule_blocks:', payload);
       clearCache(); // Limpar cache imediatamente
       debouncedReload(100); // Reduzido de 300ms para 100ms
     },
     onChange: (payload) => {
-      console.log('🔄 useAppointments: Evento genérico em schedule_blocks:', payload);
+      devLog('🔄 useAppointments: Evento genérico em schedule_blocks:', payload);
       clearCache(); // Limpar cache imediatamente
       debouncedReload(100); // Reduzido de 350ms para 100ms
     },
@@ -240,19 +325,79 @@ export const useAppointments = () => {
     const channel = supabase
       .channel('appointments-sync')
       .on('broadcast', { event: 'appointments_change' }, (payload) => {
-        console.log('📡 Broadcast recebido: appointments_change', payload);
-        clearCache(); // Limpar cache imediatamente
+        devLog('📡 Broadcast recebido: appointments_change', payload);
+        const broadcast = payload?.payload;
+        const appointmentId = broadcast?.appointmentId;
+        const action = broadcast?.action;
+
+        if (appointmentId !== null && appointmentId !== undefined) {
+          const numericId = typeof appointmentId === 'string' ? Number(appointmentId) : appointmentId;
+          if (!Number.isFinite(numericId)) {
+            clearCache();
+            debouncedReload(100);
+            return;
+          }
+
+          if (action === 'deleted') {
+            removeAppointmentFromCache(numericId);
+            setAppointments(prev => prev.filter(a => a.id !== numericId));
+            return;
+          }
+
+          void (async () => {
+            try {
+              const full = await fetchAppointmentById(numericId);
+              if (!full) {
+                clearCache();
+                debouncedReload(100);
+                return;
+              }
+
+              upsertAppointmentInCache(full);
+
+              const inFilters = isRowWithinFilters(full);
+              setAppointments(prev => {
+                const idx = prev.findIndex(a => a.id === full.id);
+                if (inFilters) {
+                  if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = full;
+                    return sortAppointmentsAsc(next);
+                  }
+                  setTotalCount(c => c + 1);
+                  return sortAppointmentsAsc([full, ...prev]);
+                }
+
+                if (idx >= 0) {
+                  setTotalCount(c => Math.max(0, c - 1));
+                  return prev.filter(a => a.id !== full.id);
+                }
+
+                return prev;
+              });
+            } catch (error) {
+              console.error('❌ Erro ao processar broadcast appointments_change:', error);
+              clearCache();
+              debouncedReload(100);
+            }
+          })();
+
+          return;
+        }
+
+        clearCache(); // Fallback para mudanças sem appointmentId
         debouncedReload(100); // Reduzido de 450ms para 100ms
       })
       .on('broadcast', { event: 'heartbeat' }, (payload) => {
-        console.log('💓 Heartbeat recebido:', payload.payload?.timestamp);
+        devLog('💓 Heartbeat recebido:', payload.payload?.timestamp);
       })
       .subscribe((status) => {
-        console.log('🔌 Broadcast channel status:', status);
+        devLog('🔌 Broadcast channel status:', status);
+        realtimeActiveRef.current = status === 'SUBSCRIBED';
         
         // Reconectar automaticamente em caso de erro
         if (status === 'CHANNEL_ERROR') {
-          console.log('🔄 Tentando reconectar broadcast channel...');
+          devLog('🔄 Tentando reconectar broadcast channel...');
           setTimeout(() => {
             channel.subscribe();
           }, 3000);
@@ -283,10 +428,10 @@ export const useAppointments = () => {
         reloadTimerRef.current = null;
       }
     };
-  }, [debouncedReload, clearCache]);
+  }, [debouncedReload, clearCache, fetchAppointmentById, isRowWithinFilters, removeAppointmentFromCache, sortAppointmentsAsc, upsertAppointmentInCache]);
 
   // Helper para enviar broadcast após qualquer alteração (COM RETRY)
-  const notifyAppointmentsChange = async (action = 'change', appointmentId = null) => {
+  const notifyAppointmentsChange = async (action: string = 'change', appointmentId: number | null = null) => {
     try {
       // 🚀 LIMPAR CACHE quando dados são modificados
       clearCache();
@@ -310,7 +455,7 @@ export const useAppointments = () => {
             event: 'appointments_change',
             payload
           });
-          console.log(`📣 Broadcast enviado (tentativa ${attempt + 1}):`, payload);
+          devLog(`📣 Broadcast enviado (tentativa ${attempt + 1}):`, payload);
           break; // Sucesso, sair do loop
         } catch (error) {
           console.error(`❌ Erro no broadcast (tentativa ${attempt + 1}):`, error);
@@ -329,8 +474,6 @@ export const useAppointments = () => {
     barberId?: number
   ): Promise<AppointmentsResponse> => {
     try {
-      // Persistir filtros atuais sempre que buscar
-      lastFiltersRef.current = { startDate, endDate, barberId };
       const now = new Date();
       const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       defaultStart.setDate(defaultStart.getDate() - 15); // OTIMIZADO: apenas 15 dias no passado
@@ -338,17 +481,21 @@ export const useAppointments = () => {
       defaultEnd.setDate(defaultEnd.getDate() + 75); // OTIMIZADO: 75 dias no futuro
       const effectiveStart = startDate ?? defaultStart;
       const effectiveEnd = endDate ?? new Date(defaultEnd.getFullYear(), defaultEnd.getMonth(), defaultEnd.getDate(), 23, 59, 59, 999);
+      const effectiveBarberId = barberId ?? (user?.role === 'barber' ? user.barber?.id : undefined);
+      
+      // Persistir filtros efetivos sempre que buscar
+      lastFiltersRef.current = { startDate: effectiveStart, endDate: effectiveEnd, barberId: effectiveBarberId };
       
       // 🚀 VERIFICAR CACHE PRIMEIRO
-      const cacheKey = `${effectiveStart.toISOString()}-${effectiveEnd.toISOString()}-${barberId || 'all'}`;
+      const cacheKey = getCacheKey(effectiveStart, effectiveEnd, effectiveBarberId);
       const cached = cacheRef.current.get(cacheKey);
       
       if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-        console.log('📦 Cache HIT - Usando dados do cache:', cacheKey);
+        devLog('📦 Cache HIT - Usando dados do cache:', cacheKey);
         return cached.data;
       }
       
-      console.log('🔍 Cache MISS - Buscando dados do servidor:', cacheKey);
+      devLog('🔍 Cache MISS - Buscando dados do servidor:', cacheKey);
       // Função para buscar uma página de agendamentos (OTIMIZADA - sem JOINs)
       const fetchPage = async (from: number, to: number) => {
         let query = supabase
@@ -367,10 +514,8 @@ export const useAppointments = () => {
           .lte('appointment_datetime', effectiveEnd.toISOString());
 
         // Filtrar por barbeiro se fornecido ou se usuário é barbeiro
-        if (barberId) {
-          query = query.eq('barber_id', barberId);
-        } else if (user?.role === 'barber' && user.barber?.id) {
-          query = query.eq('barber_id', user.barber.id);
+        if (effectiveBarberId) {
+          query = query.eq('barber_id', effectiveBarberId);
         }
 
         return await query;
@@ -446,12 +591,20 @@ export const useAppointments = () => {
       };
       
       // 🚀 ARMAZENAR NO CACHE
+      const version = appointmentsWithServices.reduce<string | null>((max, a) => {
+        if (!a?.updated_at) return max;
+        if (!max) return a.updated_at;
+        return a.updated_at > max ? a.updated_at : max;
+      }, null);
+      
       cacheRef.current.set(cacheKey, {
         data: result,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        version,
+        meta: { startIso: effectiveStart.toISOString(), endIso: effectiveEnd.toISOString(), barberId: effectiveBarberId ?? null }
       });
       
-      console.log('💾 Dados armazenados no cache:', cacheKey, `(${appointmentsWithServices.length} registros)`);
+      devLog('💾 Dados armazenados no cache:', cacheKey, `(${appointmentsWithServices.length} registros)`);
       return result;
     } catch (error) {
       console.error('Erro ao buscar agendamentos:', error);
@@ -518,9 +671,9 @@ export const useAppointments = () => {
         recurrence
       );
       
-      console.log('Data original do form:', formData.appointment_datetime);
-      console.log('Data convertida:', appointmentDates[0]);
-      console.log('Data que será salva:', toLocalISOString(appointmentDates[0]));
+      devLog('Data original do form:', formData.appointment_datetime);
+      devLog('Data convertida:', appointmentDates[0]);
+      devLog('Data que será salva:', toLocalISOString(appointmentDates[0]));
 
       // Buscar dados do cliente
       const { data: clientData, error: clientError } = await supabase
@@ -664,6 +817,15 @@ export const useAppointments = () => {
       toast.success(message);
       // Notificar outras sessões (admin/barbeiro)
       await notifyAppointmentsChange('created', firstAppointment.id);
+      
+      await logAudit(
+        user?.id,
+        'CREATE',
+        'appointment',
+        firstAppointment.id,
+        `Criou agendamento para o cliente ID ${formData.client_id} com o barbeiro ID ${formData.barber_id}`
+      );
+
       return firstAppointment;
     } catch (error: any) {
       console.error('Erro ao criar agendamento:', error);
@@ -778,8 +940,17 @@ export const useAppointments = () => {
       };
   
       toast.success(statusMessages[status as keyof typeof statusMessages] || 'Status atualizado');
+      
+      await logAudit(
+        user?.id,
+        'STATUS_CHANGE',
+        'appointment',
+        id,
+        `Alterou status do agendamento para ${status}`
+      );
+
       // Notificar e recarregar
-      await notifyAppointmentsChange();
+      await notifyAppointmentsChange('updated', id);
       debouncedReload(300);
   
       return true;
@@ -802,7 +973,7 @@ export const useAppointments = () => {
 
       toast.success('Lembrete marcado como enviado');
       // Opcional: recarregar lista para refletir alteração
-      await notifyAppointmentsChange();
+      await notifyAppointmentsChange('updated', id);
       debouncedReload(300);
       return true;
     } catch (error: any) {
@@ -822,7 +993,16 @@ export const useAppointments = () => {
       if (error) throw error;
 
       toast.success('Agendamento reagendado com sucesso!');
-      await notifyAppointmentsChange();
+      
+      await logAudit(
+        user?.id,
+        'RESCHEDULE',
+        'appointment',
+        id,
+        `Reagendou agendamento para ${newDateTime}`
+      );
+
+      await notifyAppointmentsChange('updated', id);
       return true;
     } catch (error: any) {
       console.error('Erro ao reagendar:', error);
@@ -924,7 +1104,16 @@ export const useAppointments = () => {
       if (insertServicesError) throw insertServicesError;
 
       toast.success('Agendamento atualizado com sucesso!');
-      await notifyAppointmentsChange();
+      
+      await logAudit(
+        user?.id,
+        'UPDATE',
+        'appointment',
+        appointmentId,
+        `Atualizou detalhes do agendamento (Cliente: ${updateData.client_id}, Barbeiro: ${updateData.barber_id})`
+      );
+
+      await notifyAppointmentsChange('updated', appointmentId);
       // Recarregar agendamentos após atualização bem-sucedida
       debouncedReload(300);
       
@@ -940,7 +1129,7 @@ export const useAppointments = () => {
   const handleBlockSchedule = async (blockData: { date: string; startTime: string; endTime: string; reason?: string }) => {
     try {
       // Aqui implementaremos a lógica para salvar o bloqueio no banco de dados
-      console.log('Bloqueio criado:', blockData);
+      devLog('Bloqueio criado:', blockData);
       toast.success('Período bloqueado com sucesso!');
       setShowBlockModal(false);
       // Recarregar agendamentos para refletir o bloqueio
@@ -962,17 +1151,17 @@ export const useAppointments = () => {
     recurrencePattern?: any;
     recurrenceEndDate?: string;
   }): Promise<boolean> => {
-    console.log('🚀 createScheduleBlock: Iniciando criação de bloqueio');
-    console.log('📋 Dados recebidos:', blockData);
-    console.log('👤 Usuário atual:', { id: user?.id, role: user?.role });
+    devLog('🚀 createScheduleBlock: Iniciando criação de bloqueio');
+    devLog('📋 Dados recebidos:', blockData);
+    devLog('👤 Usuário atual:', { id: user?.id, role: user?.role });
     
     try {
       let finalBarberId = blockData.barberId;
-      console.log('🎯 barberId inicial:', finalBarberId);
+      devLog('🎯 barberId inicial:', finalBarberId);
 
       // Se for barbeiro, forçar o uso do próprio ID
       if (user?.role === 'barber') {
-        console.log('👨‍💼 Usuário é barbeiro, buscando ID do barbeiro...');
+        devLog('👨‍💼 Usuário é barbeiro, buscando ID do barbeiro...');
         // Buscar o barbeiro correspondente ao usuário logado
         const { data: barberData, error: barberError } = await supabase
           .from('barbers')
@@ -987,19 +1176,19 @@ export const useAppointments = () => {
         }
 
         finalBarberId = barberData.id;
-        console.log('✅ ID do barbeiro encontrado:', finalBarberId);
+        devLog('✅ ID do barbeiro encontrado:', finalBarberId);
       }
 
       // Admin pode criar bloqueio geral (para todos os barbeiros) sem especificar barbeiro
       if (user?.role === 'admin' && !finalBarberId) {
-        console.log('ℹ️ Admin criando bloqueio geral (sem barbeiro específico)');
+        devLog('ℹ️ Admin criando bloqueio geral (sem barbeiro específico)');
       }
 
-      console.log('✅ Validação de barbeiro passou. finalBarberId:', finalBarberId);
+      devLog('✅ Validação de barbeiro passou. finalBarberId:', finalBarberId);
 
       // Validar dados de recorrência
       if (blockData.isRecurring) {
-        console.log('🔄 Validando dados de recorrência...');
+        devLog('🔄 Validando dados de recorrência...');
         if (!blockData.recurrenceType || !blockData.recurrencePattern || !blockData.recurrenceEndDate) {
           console.error('❌ Dados de recorrência incompletos:', {
             recurrenceType: blockData.recurrenceType,
@@ -1009,7 +1198,7 @@ export const useAppointments = () => {
           toast.error('Dados de recorrência incompletos');
           return false;
         }
-        console.log('✅ Dados de recorrência válidos');
+        devLog('✅ Dados de recorrência válidos');
       }
 
       // Normalizar e validar data/hora
@@ -1054,8 +1243,8 @@ export const useAppointments = () => {
         recurrence_end_date: blockData.isRecurring ? blockData.recurrenceEndDate : null
       };
 
-      console.log('💾 Dados para inserção no banco:', insertData);
-      console.log('🔄 Executando insert na tabela schedule_blocks...');
+      devLog('💾 Dados para inserção no banco:', insertData);
+      devLog('🔄 Executando insert na tabela schedule_blocks...');
 
       const { error } = await supabase
         .from('schedule_blocks')
@@ -1066,7 +1255,7 @@ export const useAppointments = () => {
         throw error;
       }
 
-      console.log('✅ Bloqueio inserido com sucesso no banco!');
+      devLog('✅ Bloqueio inserido com sucesso no banco!');
 
       if (blockData.isRecurring) {
         toast.success('Bloqueio recorrente criado com sucesso!');
@@ -1101,7 +1290,17 @@ export const useAppointments = () => {
       if (error) throw error;
 
       toast.success('Agendamento excluído com sucesso!');
-      await notifyAppointmentsChange();
+      
+      await logAudit(
+        user?.id,
+        'DELETE',
+        'appointment',
+        id,
+        'Excluiu agendamento'
+      );
+
+      const numericId = Number(id);
+      await notifyAppointmentsChange('deleted', Number.isFinite(numericId) ? numericId : null);
       // Recarregar agendamentos após exclusão bem-sucedida
       await reloadAppointments();
       
@@ -1114,10 +1313,10 @@ export const useAppointments = () => {
   };
 
   const deleteRecurringAppointments = async (recurrenceGroupId: string) => {
-    console.log('🗑️ Iniciando exclusão de agendamentos recorrentes:', recurrenceGroupId);
+    devLog('🗑️ Iniciando exclusão de agendamentos recorrentes:', recurrenceGroupId);
     try {
       // Buscar todos os agendamentos da série recorrente
-      console.log('🔍 Buscando agendamentos do grupo recorrente...');
+      devLog('🔍 Buscando agendamentos do grupo recorrente...');
       const { data: appointments, error: fetchError } = await supabase
         .from('appointments')
         .select('id')
@@ -1128,19 +1327,19 @@ export const useAppointments = () => {
         throw fetchError;
       }
 
-      console.log(`📊 Agendamentos encontrados: ${appointments?.length || 0}`);
+      devLog(`📊 Agendamentos encontrados: ${appointments?.length || 0}`);
 
       if (!appointments || appointments.length === 0) {
-        console.log('⚠️ Nenhum agendamento encontrado na série recorrente');
+        devLog('⚠️ Nenhum agendamento encontrado na série recorrente');
         toast.error('Nenhum agendamento encontrado na série recorrente');
         return false;
       }
 
       const appointmentIds = appointments.map(app => app.id);
-      console.log(`🎯 IDs dos agendamentos a serem excluídos: ${appointmentIds.join(', ')}`);
+      devLog(`🎯 IDs dos agendamentos a serem excluídos: ${appointmentIds.join(', ')}`);
 
       // Primeiro deletar todos os serviços dos agendamentos
-      console.log('🗑️ Deletando serviços dos agendamentos...');
+      devLog('🗑️ Deletando serviços dos agendamentos...');
       const { error: servicesError } = await supabase
         .from('appointment_services')
         .delete()
@@ -1151,10 +1350,10 @@ export const useAppointments = () => {
         throw servicesError;
       }
 
-      console.log('✅ Serviços deletados com sucesso');
+      devLog('✅ Serviços deletados com sucesso');
 
       // Depois deletar todos os agendamentos
-      console.log('🗑️ Deletando agendamentos...');
+      devLog('🗑️ Deletando agendamentos...');
       const { error } = await supabase
         .from('appointments')
         .delete()
@@ -1165,7 +1364,7 @@ export const useAppointments = () => {
         throw error;
       }
 
-      console.log('✅ Agendamentos deletados com sucesso');
+      devLog('✅ Agendamentos deletados com sucesso');
 
       // Verificar se realmente foram deletados
       const { data: remainingAppointments } = await supabase
@@ -1173,7 +1372,7 @@ export const useAppointments = () => {
         .select('id')
         .eq('recurrence_group_id', recurrenceGroupId);
 
-      console.log(`📊 Agendamentos restantes após exclusão: ${remainingAppointments?.length || 0}`);
+      devLog(`📊 Agendamentos restantes após exclusão: ${remainingAppointments?.length || 0}`);
 
       toast.success(`${appointments.length} agendamentos da série recorrente excluídos com sucesso!`);
       await notifyAppointmentsChange();
@@ -1515,15 +1714,84 @@ export const useAppointments = () => {
 
   // 🚀 FALLBACK com polling para garantir sincronização
   useEffect(() => {
-    // Polling como backup a cada 15 segundos
-    const pollInterval = setInterval(() => {
-      console.log('🔄 Polling de backup executado');
-      clearCache(); // Limpar cache antes do polling
-      reloadAppointments();
-    }, 15000); // A cada 15 segundos
+    const POLL_INTERVAL_MS = 5 * 60 * 1000;
+    let cancelled = false;
+    let inFlight = false;
 
-    return () => clearInterval(pollInterval);
-  }, [reloadAppointments, clearCache]);
+    const fetchHeartbeat = async (startDate: Date, endDate: Date, barberId?: number) => {
+      let query = supabase
+        .from('appointments')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .range(0, 0);
+
+      query = query
+        .gte('appointment_datetime', startDate.toISOString())
+        .lte('appointment_datetime', endDate.toISOString());
+
+      if (barberId) {
+        query = query.eq('barber_id', barberId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data?.[0]?.updated_at ?? null;
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (inFlight) return;
+      inFlight = true;
+
+      try {
+        if (realtimeActiveRef.current) return;
+
+        const { startDate, endDate, barberId } = getEffectiveFilters();
+        const cacheKey = getCacheKey(startDate, endDate, barberId);
+        const cached = cacheRef.current.get(cacheKey);
+
+        const heartbeatVersion = await fetchHeartbeat(startDate, endDate, barberId);
+        const cachedVersion = cached?.version ?? null;
+
+        if (cached && heartbeatVersion === cachedVersion) {
+          touchCache(cacheKey);
+          return;
+        }
+
+        if (!cached && heartbeatVersion === null) {
+          invalidateCacheKey(cacheKey);
+          await reloadAppointments(startDate, endDate, barberId);
+          return;
+        }
+
+        if (heartbeatVersion !== cachedVersion) {
+          invalidateCacheKey(cacheKey);
+          await reloadAppointments(startDate, endDate, barberId);
+          return;
+        }
+
+        if (cached) {
+          touchCache(cacheKey);
+        } else {
+          invalidateCacheKey(cacheKey);
+          await reloadAppointments(startDate, endDate, barberId);
+        }
+      } catch (error) {
+        console.error('❌ Erro no polling de backup:', error);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const pollInterval = setInterval(() => {
+      void tick();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollInterval);
+    };
+  }, [getEffectiveFilters, getCacheKey, touchCache, invalidateCacheKey, reloadAppointments]);
 
   return {
     appointments,

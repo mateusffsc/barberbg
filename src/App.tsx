@@ -16,6 +16,7 @@ import { Sales } from './pages/Sales';
 import { Reports } from './pages/Reports';
 import { MyReports } from './pages/MyReports';
 import { Expenses } from './pages/Expenses';
+import { AuditLogs } from './pages/AuditLogs';
 
 const RoleLanding: React.FC = () => {
   const { user } = useAuth();
@@ -67,6 +68,12 @@ function App() {
             <Route path="relatorios" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Reports />
+              </ProtectedRoute>
+            } />
+
+            <Route path="auditoria" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AuditLogs />
               </ProtectedRoute>
             } />
             

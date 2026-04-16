@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import {
+import { 
+  Menu, 
+  X, 
+  Calendar, 
+  Users, 
+  UserCheck, 
+  Scissors, 
+  ShoppingCart, 
+  BarChart3, 
+  LogOut, 
   LayoutDashboard,
-  Calendar,
-  Users,
-  Scissors,
   Package,
-  ShoppingCart,
-  BarChart3,
-  UserCheck,
-  Menu,
-  X,
-  LogOut,
-  ChevronDown,
   Receipt,
+  Shield,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from './Logo';
@@ -38,6 +39,7 @@ const menuItems: MenuItem[] = [
   { name: 'Vendas', path: '/vendas', icon: ShoppingCart, roles: ['admin', 'barber'] },
   { name: 'Despesas', path: '/despesas', icon: Receipt, roles: ['admin'] },
   { name: 'Relatórios', path: '/relatorios', icon: BarChart3, roles: ['admin'] },
+  { name: 'Auditoria', path: '/auditoria', icon: Shield, roles: ['admin'] },
   { name: 'Minhas Comissões', path: '/minhas-comissoes', icon: BarChart3, roles: ['barber'] },
 ];
 
