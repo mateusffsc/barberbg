@@ -51,11 +51,11 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isClientsRestricted = user?.id === 14 || user?.barber?.id === 6;
+  const clientsPageEnabled = import.meta.env.VITE_ENABLE_CLIENTS_PAGE === 'true';
 
   const filteredMenuItems = menuItems.filter(item => 
     item.roles.includes(user?.role || 'barber')
-  ).filter(item => !(isClientsRestricted && item.path === '/clientes'));
+  ).filter(item => !(item.path === '/clientes' && !clientsPageEnabled));
 
   const handleSignOut = async () => {
     try {

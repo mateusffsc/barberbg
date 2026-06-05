@@ -25,6 +25,8 @@ const RoleLanding: React.FC = () => {
 };
 
 function App() {
+  const clientsPageEnabled = import.meta.env.VITE_ENABLE_CLIENTS_PAGE === 'true';
+
   return (
     <AuthProvider>
       <Router>
@@ -101,9 +103,7 @@ function App() {
               <Dashboard />
             } />
             <Route path="clientes" element={
-              <ProtectedRoute deniedUserIds={[14]} deniedBarberIds={[6]}>
-                <Clients />
-              </ProtectedRoute>
+              clientsPageEnabled ? <Clients /> : <Navigate to="/unauthorized" replace />
             } />
             
             <Route path="vendas" element={
