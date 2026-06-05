@@ -31,6 +31,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     if (!forceRefreshEnabled) return;
+    if (!user) return;
 
     const channel = supabase
       .channel('app-control', {
@@ -43,14 +44,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const last = sessionStorage.getItem('lastForceRefreshAt');
         if (last && now - Number(last) < 5000) return;
         sessionStorage.setItem('lastForceRefreshAt', String(now));
-        window.location.reload();
+        if (document.visibilityState === 'visible') {
+          window.location.reload();
+        } else {
+          sessionStorage.setItem('pendingForceRefresh', 'true');
+        }
       })
       .subscribe();
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      const pending = sessionStorage.getItem('pendingForceRefresh');
+      if (pending !== 'true') return;
+      sessionStorage.removeItem('pendingForceRefresh');
+      window.location.reload();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       channel.unsubscribe();
     };
-  }, [forceRefreshEnabled]);
+  }, [forceRefreshEnabled, user]);
 
   const checkAuth = async () => {
     try {
