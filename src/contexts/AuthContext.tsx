@@ -17,6 +17,10 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const authSessionVersion = import.meta.env.VITE_AUTH_SESSION_VERSION ?? '2';
+  const authStorageKey = `barbershop_user_v${authSessionVersion}`;
+  const legacyAuthStorageKey = 'barbershop_user';
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,13 +30,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const savedUser = localStorage.getItem('barbershop_user');
+      const savedUser = localStorage.getItem(authStorageKey);
       if (savedUser) {
         setUser(JSON.parse(savedUser));
+        return;
+      }
+
+      const legacySavedUser = localStorage.getItem(legacyAuthStorageKey);
+      if (legacySavedUser) {
+        if (authSessionVersion === '1') {
+          localStorage.setItem(authStorageKey, legacySavedUser);
+          setUser(JSON.parse(legacySavedUser));
+        }
+        localStorage.removeItem(legacyAuthStorageKey);
       }
     } catch (error) {
       console.error('AuthContext: Erro ao verificar auth', error);
-      localStorage.removeItem('_user');
+      localStorage.removeItem(authStorageKey);
+      localStorage.removeItem(legacyAuthStorageKey);
     } finally {
       setLoading(false);
     }
@@ -46,7 +61,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userData = await supabaseSignIn(username, password);
       
       setUser(userData);
-      localStorage.setItem('barbershop_user', JSON.stringify(userData));
+      localStorage.setItem(authStorageKey, JSON.stringify(userData));
       
     } catch (error) {
       console.error('AuthContext: Erro no login:', error);
@@ -61,7 +76,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       setUser(null);
-      localStorage.removeItem('barbershop_user');
+      localStorage.removeItem(authStorageKey);
+      localStorage.removeItem(legacyAuthStorageKey);
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
