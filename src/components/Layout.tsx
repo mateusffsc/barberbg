@@ -14,12 +14,15 @@ import {
   Package,
   Receipt,
   Shield,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from './Logo';
+import { ConfirmDialog } from './ui/ConfirmDialog';
+import { supabase } from '../lib/supabase';
 
 interface MenuItem {
   name: string;
@@ -47,15 +50,67 @@ export const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isForceRefreshDialogOpen, setIsForceRefreshDialogOpen] = useState(false);
+  const [forceRefreshing, setForceRefreshing] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   const clientsPageEnabled = import.meta.env.VITE_ENABLE_CLIENTS_PAGE === 'true';
+  const forceRefreshEnabled = import.meta.env.VITE_ENABLE_FORCE_REFRESH !== 'false';
 
   const filteredMenuItems = menuItems.filter(item => 
     item.roles.includes(user?.role || 'barber')
   ).filter(item => !(item.path === '/clientes' && !clientsPageEnabled));
+
+  const handleForceRefresh = async () => {
+    if (!forceRefreshEnabled) {
+      window.alert('Recurso desativado');
+      return;
+    }
+
+    if (user?.role !== 'admin') {
+      window.alert('Sem permissão');
+      return;
+    }
+
+    setForceRefreshing(true);
+    try {
+      const channel = supabase.channel('app-control', {
+        config: {
+          broadcast: { self: true }
+        }
+      });
+      const status = await new Promise<string>((resolve) => {
+        channel.subscribe((s) => resolve(s));
+      });
+
+      if (status !== 'SUBSCRIBED') {
+        channel.unsubscribe();
+        throw new Error('Falha ao conectar no Realtime');
+      }
+
+      const result = await channel.send({
+        type: 'broadcast',
+        event: 'force_refresh',
+        payload: { at: Date.now() }
+      });
+
+      channel.unsubscribe();
+
+      if (result !== 'ok') {
+        throw new Error('Falha ao enviar sinal de refresh');
+      }
+
+      setIsForceRefreshDialogOpen(false);
+      setUserMenuOpen(false);
+    } catch (error) {
+      console.error(error);
+      window.alert('Não foi possível atualizar todos agora');
+    } finally {
+      setForceRefreshing(false);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -199,6 +254,15 @@ export const Layout: React.FC = () => {
 
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                  {user?.role === 'admin' && forceRefreshEnabled && (
+                    <button
+                      onClick={() => setIsForceRefreshDialogOpen(true)}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Atualizar app
+                    </button>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -217,6 +281,17 @@ export const Layout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+
+      <ConfirmDialog
+        isOpen={isForceRefreshDialogOpen}
+        onClose={() => setIsForceRefreshDialogOpen(false)}
+        onConfirm={handleForceRefresh}
+        title="Atualizar para todos"
+        message="Isso vai recarregar o sistema para todos os usuários conectados."
+        confirmText="Atualizar agora"
+        type="warning"
+        loading={forceRefreshing}
+      />
     </div>
   );
 };

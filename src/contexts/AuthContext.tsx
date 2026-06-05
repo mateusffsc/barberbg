@@ -20,6 +20,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const authSessionVersion = import.meta.env.VITE_AUTH_SESSION_VERSION ?? '2';
   const authStorageKey = `barbershop_user_v${authSessionVersion}`;
   const legacyAuthStorageKey = 'barbershop_user';
+  const forceRefreshEnabled = import.meta.env.VITE_ENABLE_FORCE_REFRESH !== 'false';
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!forceRefreshEnabled) return;
+
+    const channel = supabase
+      .channel('app-control', {
+        config: {
+          broadcast: { self: true }
+        }
+      })
+      .on('broadcast', { event: 'force_refresh' }, () => {
+        const now = Date.now();
+        const last = sessionStorage.getItem('lastForceRefreshAt');
+        if (last && now - Number(last) < 5000) return;
+        sessionStorage.setItem('lastForceRefreshAt', String(now));
+        window.location.reload();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [forceRefreshEnabled]);
 
   const checkAuth = async () => {
     try {
