@@ -34,6 +34,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   loading = false
 }) => {
   const { user } = useAuth();
+  const hideClientPhone = user?.id === 14 || user?.barber?.id === 6;
   const [formData, setFormData] = useState<AppointmentFormData>({
     client_id: 0,
     barber_id: user?.role === 'barber' ? user.barber?.id || 0 : 0,
@@ -109,10 +110,14 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     setSearchingClients(true);
     try {
+      const orClause = hideClientPhone
+        ? `name.ilike.%${searchTerm}%`
+        : `name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`;
+
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+        .or(orClause)
         .order('name');
 
       if (error) throw error;
@@ -441,7 +446,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                               onClick={() => handleClientSelect(client)}
                             >
                               <span className="block truncate font-medium">{client.name}</span>
-                              {client.phone && (
+                              {!hideClientPhone && client.phone && (
                                 <span className="block text-sm text-gray-500">{client.phone}</span>
                               )}
                             </div>

@@ -6,11 +6,15 @@ import { UserRole } from '../types/auth';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
+  deniedUserIds?: number[];
+  deniedBarberIds?: number[];
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  allowedRoles 
+  allowedRoles,
+  deniedUserIds,
+  deniedBarberIds
 }) => {
   const { user, loading } = useAuth();
 
@@ -27,6 +31,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (deniedUserIds?.includes(user.id)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (deniedBarberIds && user.barber?.id && deniedBarberIds.includes(user.barber.id)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

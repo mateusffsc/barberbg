@@ -101,7 +101,9 @@ function App() {
               <Dashboard />
             } />
             <Route path="clientes" element={
-              <Clients />
+              <ProtectedRoute deniedUserIds={[14]} deniedBarberIds={[6]}>
+                <Clients />
+              </ProtectedRoute>
             } />
             
             <Route path="vendas" element={
