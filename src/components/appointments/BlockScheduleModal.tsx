@@ -46,7 +46,8 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
   // Exibir lista de barbeiros sem barbeiros específicos
   const displayBarbers = barbers.filter(b => {
     const name = (b.name || '').toLowerCase();
-    return name !== 'rose' && !name.includes('luiz henrique');
+    const isActive = b.user?.is_active !== false;
+    return isActive && name !== 'rose' && !name.includes('luiz henrique');
   });
 
   // Carregar barbeiros quando o modal abrir
@@ -71,7 +72,7 @@ export const BlockScheduleModal: React.FC<BlockScheduleModalProps> = ({
 
   const loadBarbers = async () => {
     try {
-      const result = await fetchBarbers(1, '', 1000);
+      const result = await fetchBarbers(1, '', 1000, { onlyActive: true });
       
       // Atualizar o estado local com os barbeiros carregados
       if (result.barbers && result.barbers.length > 0) {

@@ -74,7 +74,10 @@ export const BarbersTable: React.FC<BarbersTableProps> = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {barbers.map((barber) => (
-              <tr key={barber.id} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={barber.id}
+                className={`transition-colors ${barber.user?.is_active === false ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+              >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
@@ -114,8 +117,14 @@ export const BarbersTable: React.FC<BarbersTableProps> = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Ativo
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      barber.user?.is_active === false
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}
+                  >
+                    {barber.user?.is_active === false ? 'Inativo' : 'Ativo'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -129,8 +138,12 @@ export const BarbersTable: React.FC<BarbersTableProps> = ({
                     </button>
                     <button
                       onClick={() => onToggleStatus(barber)}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded-lg hover:bg-blue-50 transition-colors"
-                      title="Ativar/Desativar barbeiro"
+                      className={`p-1 rounded-lg transition-colors ${
+                        barber.user?.is_active === false
+                          ? 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                          : 'text-blue-600 hover:text-blue-900 hover:bg-blue-50'
+                      }`}
+                      title={barber.user?.is_active === false ? 'Ativar barbeiro' : 'Inativar barbeiro'}
                     >
                       <Power className="h-4 w-4" />
                     </button>

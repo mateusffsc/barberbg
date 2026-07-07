@@ -14,6 +14,7 @@ export interface Barber {
     id: number;
     username: string;
     role: string;
+    is_active: boolean;
   };
 }
 

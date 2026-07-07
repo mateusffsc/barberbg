@@ -80,7 +80,17 @@ export const Barbers: React.FC = () => {
   };
 
   const handleToggleStatus = async (barber: Barber) => {
-    await toggleBarberStatus(barber.id, barber.user_id, true);
+    const updatedBarber = await toggleBarberStatus(
+      barber.id,
+      barber.user_id,
+      barber.user?.is_active !== false
+    );
+
+    if (updatedBarber) {
+      setBarbers(prev =>
+        prev.map(item => item.id === barber.id ? updatedBarber : item)
+      );
+    }
   };
 
   const handleModalSubmit = async (formData: BarberFormData | BarberUpdateData) => {

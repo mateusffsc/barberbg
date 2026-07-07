@@ -4,6 +4,10 @@ import { Barber, BarberFormData, BarberUpdateData, BarbersResponse } from '../ty
 import toast from 'react-hot-toast';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
 
+interface FetchBarbersOptions {
+  onlyActive?: boolean;
+}
+
 export const useBarbers = () => {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,10 +34,19 @@ export const useBarbers = () => {
     showNotifications: false
   });
 
+  useRealtimeSubscription({
+    table: 'users',
+    onChange: () => {
+      reloadBarbers();
+    },
+    showNotifications: false
+  });
+
   const fetchBarbers = async (
     page: number = 1,
     search: string = '',
-    pageSize: number = 10
+    pageSize: number = 10,
+    options: FetchBarbersOptions = {}
   ): Promise<BarbersResponse> => {
     try {
       const from = (page - 1) * pageSize;
@@ -43,6 +56,7 @@ export const useBarbers = () => {
         .from('barbers')
         .select(`
           id,
+          user_id,
           name,
           phone,
           email,
@@ -50,7 +64,7 @@ export const useBarbers = () => {
           commission_rate_service,
           commission_rate_product,
           commission_rate_chemical_service,
-          user:users(id, username, role)
+          user:users(id, username, role, is_active)
         `, { count: 'exact' })
         .range(from, to)
         .order('name');
@@ -66,9 +80,14 @@ export const useBarbers = () => {
 
       if (error) throw error;
 
+      const normalizedBarbers = (data || []).filter((barber) => {
+        if (!options.onlyActive) return true;
+        return barber.user?.is_active !== false;
+      });
+
       return {
-        barbers: data || [],
-        count: count || 0
+        barbers: normalizedBarbers,
+        count: options.onlyActive ? normalizedBarbers.length : (count || 0)
       };
     } catch (error) {
       console.error('Erro ao buscar barbeiros:', error);
@@ -106,7 +125,8 @@ export const useBarbers = () => {
         .insert({
           username: barberData.username.trim(),
           password_hash: barberData.password, // Em produção, fazer hash da senha
-          role: 'barber'
+          role: 'barber',
+          is_active: true
         })
         .select()
         .single();
@@ -132,7 +152,7 @@ export const useBarbers = () => {
         })
         .select(`
           *,
-          user:users(id, username, role)
+          user:users(id, username, role, is_active)
         `)
         .single();
 
@@ -195,7 +215,7 @@ export const useBarbers = () => {
         .eq('id', id)
         .select(`
           *,
-          user:users(id, username, role)
+          user:users(id, username, role, is_active)
         `)
         .single();
 
@@ -216,16 +236,34 @@ export const useBarbers = () => {
     }
   };
 
-  const toggleBarberStatus = async (barberId: number, userId: number, currentStatus: boolean): Promise<boolean> => {
+  const toggleBarberStatus = async (barberId: number, userId: number, currentStatus: boolean): Promise<Barber | null> => {
     try {
-      // Para "desativar", podemos alterar o role do usuário ou adicionar um campo is_active
-      // Por simplicidade, vamos apenas mostrar uma mensagem
-      toast.info('Funcionalidade de ativar/desativar será implementada');
-      return true;
+      const nextStatus = !currentStatus;
+
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ is_active: nextStatus })
+        .eq('id', userId);
+
+      if (userError) throw userError;
+
+      const { data, error } = await supabase
+        .from('barbers')
+        .select(`
+          *,
+          user:users(id, username, role, is_active)
+        `)
+        .eq('id', barberId)
+        .single();
+
+      if (error) throw error;
+
+      toast.success(nextStatus ? 'Barbeiro ativado com sucesso!' : 'Barbeiro inativado com sucesso!');
+      return data;
     } catch (error: any) {
       console.error('Erro ao alterar status do barbeiro:', error);
       toast.error('Erro ao alterar status do barbeiro');
-      return false;
+      return null;
     }
   };
 

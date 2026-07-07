@@ -51,7 +51,8 @@ export const Appointments: React.FC = () => {
   // Exibir todos os barbeiros cadastrados, exceto barbeiros específicos
   const filteredBarbers = barbers.filter(b => {
     const name = (b.name || '').toLowerCase();
-    return name !== 'rose' && !name.includes('luiz henrique');
+    const isActive = b.user?.is_active !== false;
+    return isActive && name !== 'rose' && !name.includes('luiz henrique');
   });
 
   const {
@@ -216,8 +217,12 @@ export const Appointments: React.FC = () => {
 
   const loadBarbers = async () => {
     try {
-      const response = await fetchBarbers(1, '', 1000); // Buscar todos os barbeiros
+      const response = await fetchBarbers(1, '', 1000, { onlyActive: true });
       setBarbers(response.barbers);
+
+      if (selectedBarberId && !response.barbers.some(barber => barber.id === selectedBarberId)) {
+        setSelectedBarberId(null);
+      }
     } catch (error) {
       console.error('Erro ao carregar barbeiros:', error);
       toast.error('Erro ao carregar barbeiros');
