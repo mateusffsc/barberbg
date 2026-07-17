@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, RefreshCw, CheckCircle2, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Plus, RefreshCw, CheckCircle2, Lock, ChevronLeft, ChevronRight, AlertTriangle, History } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { useClients } from '../hooks/useClients';
 import { useBarbers } from '../hooks/useBarbers';
@@ -18,7 +18,16 @@ import { supabase } from '../lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
 import { fromLocalDateTimeString, toLocalISOString, toLocalDateString, toLocalTimeString } from '../utils/dateHelpers';
 
+interface HistoricalViewState {
+  startDate: Date;
+  endDate: Date;
+  mode: 'day' | 'custom';
+  label: string;
+}
+
 export const Appointments: React.FC = () => {
+  const HISTORY_LOOKBACK_DAYS = 15;
+  const MAX_HISTORICAL_RANGE_DAYS = 31;
   const { user } = useAuth();
   const {
     appointments,
@@ -85,6 +94,64 @@ export const Appointments: React.FC = () => {
   // Estados para o calendário mensal
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
+  const [historicalLoadModalOpen, setHistoricalLoadModalOpen] = useState(false);
+  const [pendingHistoricalDate, setPendingHistoricalDate] = useState<Date | null>(null);
+  const [historicalView, setHistoricalView] = useState<HistoricalViewState | null>(null);
+  const [historicalRangeStart, setHistoricalRangeStart] = useState('');
+  const [historicalRangeEnd, setHistoricalRangeEnd] = useState('');
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+
+  const getStartOfDay = (date: Date) => {
+    const value = new Date(date);
+    value.setHours(0, 0, 0, 0);
+    return value;
+  };
+
+  const getEndOfDay = (date: Date) => {
+    const value = new Date(date);
+    value.setHours(23, 59, 59, 999);
+    return value;
+  };
+
+  const getDefaultAppointmentRange = () => {
+    const now = new Date();
+    const start = getStartOfDay(now);
+    start.setDate(start.getDate() - HISTORY_LOOKBACK_DAYS);
+
+    const end = getEndOfDay(now);
+    end.setDate(end.getDate() + 75);
+
+    return { start, end };
+  };
+
+  const isOlderThanHistoryLimit = (date: Date) => {
+    const threshold = getStartOfDay(new Date());
+    threshold.setDate(threshold.getDate() - HISTORY_LOOKBACK_DAYS);
+    return getStartOfDay(date) < threshold;
+  };
+
+  const isDateInsideHistoricalView = (date: Date) => {
+    if (!historicalView) return false;
+    const targetTime = getStartOfDay(date).getTime();
+    return targetTime >= getStartOfDay(historicalView.startDate).getTime()
+      && targetTime <= getEndOfDay(historicalView.endDate).getTime();
+  };
+
+  const closeHistoricalLoadModal = () => {
+    setHistoricalLoadModalOpen(false);
+    setPendingHistoricalDate(null);
+    setHistoricalRangeStart('');
+    setHistoricalRangeEnd('');
+  };
+
+  const openHistoricalLoadModal = (date: Date) => {
+    const targetDate = getStartOfDay(date);
+    const targetDateString = toLocalDateString(targetDate);
+    setPendingHistoricalDate(targetDate);
+    setHistoricalRangeStart(targetDateString);
+    setHistoricalRangeEnd(targetDateString);
+    setHistoricalLoadModalOpen(true);
+  };
 
   // Funções para o calendário mensal
   const getDaysInMonth = (date: Date) => {
@@ -147,9 +214,19 @@ export const Appointments: React.FC = () => {
     });
   };
 
-  const handleCalendarDateClick = (date: Date) => {
+  const handleCalendarDateClick = async (date: Date) => {
+    if (isOlderThanHistoryLimit(date) && !isDateInsideHistoricalView(date)) {
+      openHistoricalLoadModal(date);
+      return;
+    }
+
     setSelectedCalendarDate(date);
     setSelectedDate(date);
+
+    if (!isOlderThanHistoryLimit(date) && historicalView) {
+      setHistoricalView(null);
+      await loadAppointments();
+    }
   };
 
   useEffect(() => {
@@ -169,7 +246,7 @@ export const Appointments: React.FC = () => {
   useEffect(() => {
     // Recarregar agendamentos quando o filtro de barbeiro mudar
     if (!loading) {
-      loadAppointments();
+      loadAppointments(historicalView?.startDate, historicalView?.endDate);
     }
   }, [selectedBarberId]);
 
@@ -190,9 +267,9 @@ export const Appointments: React.FC = () => {
     }
   };
 
-  const loadAppointments = async () => {
+  const loadAppointments = async (startDate?: Date, endDate?: Date) => {
     try {
-      const response = await fetchAppointments(undefined, undefined, selectedBarberId || undefined);
+      const response = await fetchAppointments(startDate, endDate, selectedBarberId || undefined);
       setAppointments(response.appointments);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
@@ -203,6 +280,70 @@ export const Appointments: React.FC = () => {
   // Função para recarregar com filtros atuais
   const reloadAppointmentsWithFilters = async () => {
     await reloadAppointments(undefined, undefined, selectedBarberId || undefined);
+  };
+
+  const activateHistoricalView = async (startDate: Date, endDate: Date, mode: 'day' | 'custom') => {
+    const normalizedStart = getStartOfDay(startDate);
+    const normalizedEnd = getEndOfDay(endDate);
+    const focusDate = pendingHistoricalDate || normalizedStart;
+    const label = mode === 'day'
+      ? `Consulta do dia ${normalizedStart.toLocaleDateString('pt-BR')}`
+      : `Consulta do período ${normalizedStart.toLocaleDateString('pt-BR')} até ${normalizedEnd.toLocaleDateString('pt-BR')}`;
+
+    setHistoricalLoading(true);
+    try {
+      await loadAppointments(normalizedStart, normalizedEnd);
+      setHistoricalView({
+        startDate: normalizedStart,
+        endDate: normalizedEnd,
+        mode,
+        label
+      });
+      setSelectedCalendarDate(focusDate);
+      setSelectedDate(focusDate);
+      closeHistoricalLoadModal();
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      toast.error('Erro ao carregar atendimentos do período solicitado');
+    } finally {
+      setHistoricalLoading(false);
+    }
+  };
+
+  const handleLoadHistoricalDay = async () => {
+    if (!pendingHistoricalDate) return;
+    await activateHistoricalView(pendingHistoricalDate, pendingHistoricalDate, 'day');
+  };
+
+  const handleLoadHistoricalPeriod = async () => {
+    if (!historicalRangeStart || !historicalRangeEnd) {
+      toast.error('Informe a data inicial e a data final');
+      return;
+    }
+
+    const startDate = getStartOfDay(new Date(`${historicalRangeStart}T00:00:00`));
+    const endDate = getEndOfDay(new Date(`${historicalRangeEnd}T00:00:00`));
+
+    if (startDate > endDate) {
+      toast.error('A data inicial deve ser anterior ou igual à data final');
+      return;
+    }
+
+    const rangeInDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (rangeInDays > MAX_HISTORICAL_RANGE_DAYS) {
+      toast.error(`O período personalizado pode ter no máximo ${MAX_HISTORICAL_RANGE_DAYS} dias`);
+      return;
+    }
+
+    await activateHistoricalView(startDate, endDate, 'custom');
+  };
+
+  const handleResetHistoricalView = async () => {
+    const defaultRange = getDefaultAppointmentRange();
+    setHistoricalView(null);
+    setSelectedCalendarDate(new Date());
+    setSelectedDate(new Date());
+    await loadAppointments(defaultRange.start, defaultRange.end);
   };
 
   const loadClients = async () => {
@@ -838,6 +979,30 @@ export const Appointments: React.FC = () => {
     <div className="h-full" style={{ minHeight: '100vh', paddingBottom: '1rem' }}>
       <Toaster position="top-right" />
 
+      {historicalView && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <History className="mt-0.5 h-5 w-5 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Consulta temporária carregada sob demanda
+                </p>
+                <p className="text-sm text-amber-800">
+                  {historicalView.label}. Ao voltar para uma data recente ou clicar abaixo, a agenda retorna ao período padrão.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleResetHistoricalView}
+              className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 transition-colors"
+            >
+              Voltar ao período padrão
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Layout Desktop (≥1024px) - com sidebar */}
       <div className="hidden lg:flex lg:space-x-4">
         {/* Sidebar esquerda com calendário mensal e botões */}
@@ -1133,6 +1298,95 @@ export const Appointments: React.FC = () => {
         onClose={() => setShowBlockModal(false)}
         onBlock={handleBlockSchedule}
       />
+
+      {historicalLoadModalOpen && pendingHistoricalDate && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center px-4 py-6 text-center">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={closeHistoricalLoadModal} />
+
+            <div className="relative inline-block w-full max-w-lg overflow-hidden rounded-lg bg-white text-left align-middle shadow-xl transition-all">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
+                <div className="mb-4 flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Carregar atendimentos antigos?
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Deseja carregar os atendimentos deste dia ou período personalizado?
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Data selecionada: {pendingHistoricalDate.toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <button
+                    onClick={handleLoadHistoricalDay}
+                    disabled={historicalLoading}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="block text-sm font-medium text-gray-900">Carregar somente este dia</span>
+                    <span className="block text-sm text-gray-600">
+                      Exibe apenas os atendimentos de {pendingHistoricalDate.toLocaleDateString('pt-BR')} para conferência.
+                    </span>
+                  </button>
+
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm font-medium text-gray-900">Ou carregar período personalizado</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Use quando precisar conferir mais de um dia. Limite de {MAX_HISTORICAL_RANGE_DAYS} dias por consulta.
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">Data inicial</label>
+                        <input
+                          type="date"
+                          value={historicalRangeStart}
+                          onChange={(e) => setHistoricalRangeStart(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                          disabled={historicalLoading}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">Data final</label>
+                        <input
+                          type="date"
+                          value={historicalRangeEnd}
+                          onChange={(e) => setHistoricalRangeEnd(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                          disabled={historicalLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleLoadHistoricalPeriod}
+                      disabled={historicalLoading}
+                      className="mt-4 w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {historicalLoading ? 'Carregando...' : 'Carregar período personalizado'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  onClick={closeHistoricalLoadModal}
+                  disabled={historicalLoading}
+                  className="mt-3 inline-flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
